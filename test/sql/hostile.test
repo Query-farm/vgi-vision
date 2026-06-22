@@ -1,0 +1,90 @@
+# name: test/sql/hostile.test
+# description: Untrusted/malformed images must yield NULL / no rows, never crash the worker
+# group: [vgi_vision]
+
+require-env VGI_VISION_WORKER
+
+statement ok
+LOAD vgi;
+
+statement ok
+ATTACH 'vision' AS vision (TYPE vgi, LOCATION '${VGI_VISION_WORKER}');
+
+# ---- garbage BLOB bytes -> NULL (worker survives hostile input) ----
+
+query I
+SELECT vision.top_label('not an image at all, just bytes'::BLOB) IS NULL;
+----
+true
+
+query I
+SELECT vision.top_label('\x00\x01\x02\xFF garbage'::BLOB) IS NULL;
+----
+true
+
+# A truncated PNG signature (8-byte magic) with no decodable data.
+query I
+SELECT vision.top_label('\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'::BLOB) IS NULL;
+----
+true
+
+# ---- empty BLOB -> NULL ----
+
+query I
+SELECT vision.top_label(''::BLOB) IS NULL;
+----
+true
+
+# ---- NULL input -> NULL output ----
+
+query I
+SELECT vision.top_label(NULL::BLOB) IS NULL;
+----
+true
+
+query I
+SELECT vision.top_label(NULL::VARCHAR) IS NULL;
+----
+true
+
+# ---- nonexistent path -> NULL ----
+
+query I
+SELECT vision.top_label('/no/such/file/anywhere.png') IS NULL;
+----
+true
+
+# ---- table functions on garbage -> no rows (still no crash) ----
+
+query I
+SELECT count(*) FROM vision.classify('not an image'::BLOB);
+----
+0
+
+query I
+SELECT count(*) FROM vision.classify(''::BLOB);
+----
+0
+
+# ---- a bad blob next to a good one: the good value still comes through ----
+
+query II rowsort
+SELECT label, vision.top_label(b) AS lbl
+FROM (
+    VALUES
+        ('garbage', 'not an image'::BLOB),
+        ('good', (SELECT content FROM read_blob('test/sql/data/sample.png')))
+) AS t(label, b);
+----
+garbage	NULL
+good	envelope
+
+# ---- worker is still alive and serving after all that hostile input ----
+
+query I
+SELECT vision.top_label('test/sql/data/sample.png') = 'envelope';
+----
+true
+
+statement ok
+DETACH vision;

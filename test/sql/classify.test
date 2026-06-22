@@ -1,0 +1,94 @@
+# name: test/sql/classify.test
+# description: Image classification over a committed tiny PNG (top_label, classify, image_classes)
+# group: [vgi_vision]
+
+require-env VGI_VISION_WORKER
+
+statement ok
+LOAD vgi;
+
+statement ok
+ATTACH 'vision' AS vision (TYPE vgi, LOCATION '${VGI_VISION_WORKER}');
+
+# ---- image_classes(): the model's full ImageNet label set ----
+
+query I
+SELECT count(*) FROM vision.image_classes();
+----
+1000
+
+# Indices are 0..999, dense.
+query I
+SELECT count(DISTINCT idx) = 1000 AND min(idx) = 0 AND max(idx) = 999
+FROM vision.image_classes();
+----
+true
+
+# ---- top_label(image): #1 prediction for the committed sample.png ----
+
+# The prediction is deterministic for this exact fixture + model (MobileNetV2-12).
+query I
+SELECT vision.top_label(content) FROM read_blob('test/sql/data/sample.png');
+----
+envelope
+
+# VARCHAR path overload yields the same label.
+query I
+SELECT vision.top_label('test/sql/data/sample.png');
+----
+envelope
+
+# top_label is always one of the model's known classes.
+query I
+SELECT vision.top_label(content) IN (SELECT label FROM vision.image_classes())
+FROM read_blob('test/sql/data/sample.png');
+----
+true
+
+# ---- classify(image): top-k rows, confidences in [0,1] descending ----
+# These use the VARCHAR path overload (classify('<path>')), which reads the file;
+# a table function argument cannot itself be a (SELECT ...) subquery.
+
+# Default top_k = 5.
+query I
+SELECT count(*) FROM vision.classify('test/sql/data/sample.png');
+----
+5
+
+# Explicit top_k.
+query I
+SELECT count(*) FROM vision.classify('test/sql/data/sample.png', 3);
+----
+3
+
+# All confidences are probabilities in [0, 1].
+query I
+SELECT bool_and(confidence >= 0.0 AND confidence <= 1.0)
+FROM vision.classify('test/sql/data/sample.png');
+----
+true
+
+# The head of the ranked list (highest confidence) is the global max -- a
+# well-formed ranked list. Row scan order in SQL is not guaranteed, so the
+# descending-emission property is asserted in the pytest suite (where emission
+# order is observable).
+query I
+SELECT max(confidence) = (
+    SELECT confidence FROM vision.classify('test/sql/data/sample.png')
+    ORDER BY confidence DESC LIMIT 1
+)
+FROM vision.classify('test/sql/data/sample.png');
+----
+true
+
+# The #1 classify row agrees with top_label, and its confidence clears a threshold.
+query I
+SELECT label = 'envelope' AND confidence > 0.10
+FROM vision.classify('test/sql/data/sample.png')
+ORDER BY confidence DESC
+LIMIT 1;
+----
+true
+
+statement ok
+DETACH vision;
