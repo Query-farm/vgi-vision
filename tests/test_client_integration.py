@@ -49,9 +49,7 @@ def test_top_label_scalar_end_to_end() -> None:
     # The image arrives as the (sole) input column; its BINARY type selects the
     # blob overload of top_label. No positional const arg is passed -- the column
     # is the argument (mirrors DuckDB's `top_label(image)` over a BLOB column).
-    batch = pa.RecordBatch.from_pydict(
-        {"image": pa.array([png_bytes((200, 30, 30)), None], type=pa.binary())}
-    )
+    batch = pa.RecordBatch.from_pydict({"image": pa.array([png_bytes((200, 30, 30)), None], type=pa.binary())})
     with _client() as client:
         results = list(
             client.scalar_function(

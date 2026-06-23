@@ -49,6 +49,8 @@ class TopLabelFunction(ScalarFunction):
     """``top_label(image)`` -- the #1 predicted ImageNet label for a BLOB image."""
 
     class Meta:
+        """VGI function metadata."""
+
         name = "top_label"
         description = "The #1 predicted ImageNet label for an image BLOB (NULL if not an image)"
         categories = ["vision", "classification"]
@@ -63,6 +65,7 @@ class TopLabelFunction(ScalarFunction):
     def compute(
         cls, image: Annotated[pa.BinaryArray, Param(doc="Image bytes (PNG/JPEG/...).")]
     ) -> Annotated[pa.StringArray, Returns()]:
+        """Return the top label for each image BLOB in the array."""
         out = [None if b is None else model.top_label_for(b) for b in image.to_pylist()]
         return pa.array(out, type=pa.string())
 
@@ -71,6 +74,8 @@ class TopLabelPathFunction(ScalarFunction):
     """``top_label(path)`` -- like ``top_label(image)`` but reads a file path."""
 
     class Meta:
+        """VGI function metadata."""
+
         name = "top_label"
         description = "The #1 predicted ImageNet label for an image file path (NULL if unreadable)"
         categories = ["vision", "classification"]
@@ -85,6 +90,7 @@ class TopLabelPathFunction(ScalarFunction):
     def compute(
         cls, path: Annotated[pa.StringArray, Param(doc="Filesystem path to an image file.")]
     ) -> Annotated[pa.StringArray, Returns()]:
+        """Return the top label for the image at each filesystem path in the array."""
         out = [None if p is None else model.top_label_for(_read_path(p)) for p in path.to_pylist()]
         return pa.array(out, type=pa.string())
 

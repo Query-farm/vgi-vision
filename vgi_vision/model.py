@@ -206,7 +206,7 @@ def labels() -> list[str]:
 
 @lru_cache(maxsize=1)
 def _input_name() -> str:
-    return _session().get_inputs()[0].name
+    return str(_session().get_inputs()[0].name)
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +244,8 @@ def _softmax(logits: np.ndarray) -> np.ndarray:
     """Numerically-stable softmax over the last axis."""
     z = logits - np.max(logits)
     e = np.exp(z)
-    return e / np.sum(e)
+    result: np.ndarray = e / np.sum(e)
+    return result
 
 
 def classify_image(data: bytes | None, top_k: int = 5) -> list[tuple[str, float]] | None:

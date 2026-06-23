@@ -30,13 +30,13 @@ from vgi import Arg
 from vgi.metadata import FunctionExample
 from vgi.table_function import (
     BindParams,
-    OutputCollector,
     ProcessParams,
     TableCardinality,
     TableFunctionGenerator,
     bind_fixed_schema,
     init_single_worker,
 )
+from vgi_rpc.rpc import OutputCollector
 
 from . import model
 from .scalars import _read_path
@@ -99,6 +99,8 @@ class ClassifyFunction(TableFunctionGenerator[_ClassifyBlobArgs]):
     FIXED_SCHEMA: ClassVar[pa.Schema] = _CLASSIFY_SCHEMA
 
     class Meta:
+        """VGI function metadata."""
+
         name = "classify"
         description = "Top-5 ImageNet predictions (label, confidence) for an image BLOB"
         categories = ["vision", "classification"]
@@ -111,10 +113,12 @@ class ClassifyFunction(TableFunctionGenerator[_ClassifyBlobArgs]):
 
     @classmethod
     def cardinality(cls, params: BindParams[_ClassifyBlobArgs]) -> TableCardinality:
+        """Estimate the output row count (the default top-k)."""
         return TableCardinality(estimate=_DEFAULT_TOP_K, max=_DEFAULT_TOP_K)
 
     @classmethod
     def process(cls, params: ProcessParams[_ClassifyBlobArgs], state: None, out: OutputCollector) -> None:
+        """Classify the image BLOB and emit the top-5 predictions."""
         preds = model.classify_image(params.args.image, top_k=_DEFAULT_TOP_K)
         _emit_classify(preds, out, params.output_schema)
 
@@ -128,6 +132,8 @@ class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs]):
     FIXED_SCHEMA: ClassVar[pa.Schema] = _CLASSIFY_SCHEMA
 
     class Meta:
+        """VGI function metadata."""
+
         name = "classify"
         description = "Top-k ImageNet predictions (label, confidence) for an image BLOB"
         categories = ["vision", "classification"]
@@ -140,11 +146,13 @@ class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs]):
 
     @classmethod
     def cardinality(cls, params: BindParams[_ClassifyBlobTopKArgs]) -> TableCardinality:
+        """Estimate the output row count (the requested top-k)."""
         k = max(1, params.args.top_k)
         return TableCardinality(estimate=k, max=k)
 
     @classmethod
     def process(cls, params: ProcessParams[_ClassifyBlobTopKArgs], state: None, out: OutputCollector) -> None:
+        """Classify the image BLOB and emit the top-k predictions."""
         preds = model.classify_image(params.args.image, top_k=params.args.top_k)
         _emit_classify(preds, out, params.output_schema)
 
@@ -174,6 +182,8 @@ class ClassifyPathFunction(TableFunctionGenerator[_ClassifyPathArgs]):
     FIXED_SCHEMA: ClassVar[pa.Schema] = _CLASSIFY_SCHEMA
 
     class Meta:
+        """VGI function metadata."""
+
         name = "classify"
         description = "Top-5 ImageNet predictions for an image file path"
         categories = ["vision", "classification"]
@@ -186,10 +196,12 @@ class ClassifyPathFunction(TableFunctionGenerator[_ClassifyPathArgs]):
 
     @classmethod
     def cardinality(cls, params: BindParams[_ClassifyPathArgs]) -> TableCardinality:
+        """Estimate the output row count (the default top-k)."""
         return TableCardinality(estimate=_DEFAULT_TOP_K, max=_DEFAULT_TOP_K)
 
     @classmethod
     def process(cls, params: ProcessParams[_ClassifyPathArgs], state: None, out: OutputCollector) -> None:
+        """Read the image off disk, classify it, and emit the top-5 predictions."""
         preds = model.classify_image(_read_path(params.args.path), top_k=_DEFAULT_TOP_K)
         _emit_classify(preds, out, params.output_schema)
 
@@ -203,6 +215,8 @@ class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs]):
     FIXED_SCHEMA: ClassVar[pa.Schema] = _CLASSIFY_SCHEMA
 
     class Meta:
+        """VGI function metadata."""
+
         name = "classify"
         description = "Top-k ImageNet predictions for an image file path"
         categories = ["vision", "classification"]
@@ -215,11 +229,13 @@ class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs]):
 
     @classmethod
     def cardinality(cls, params: BindParams[_ClassifyPathTopKArgs]) -> TableCardinality:
+        """Estimate the output row count (the requested top-k)."""
         k = max(1, params.args.top_k)
         return TableCardinality(estimate=k, max=k)
 
     @classmethod
     def process(cls, params: ProcessParams[_ClassifyPathTopKArgs], state: None, out: OutputCollector) -> None:
+        """Read the image off disk, classify it, and emit the top-k predictions."""
         preds = model.classify_image(_read_path(params.args.path), top_k=params.args.top_k)
         _emit_classify(preds, out, params.output_schema)
 
@@ -243,6 +259,8 @@ class ImageClassesFunction(TableFunctionGenerator[_NoArgs]):
     FIXED_SCHEMA: ClassVar[pa.Schema] = _CLASSES_SCHEMA
 
     class Meta:
+        """VGI function metadata."""
+
         name = "image_classes"
         description = "The model's ImageNet label set: (idx, label), 1000 rows"
         categories = ["vision", "classification"]
@@ -255,10 +273,12 @@ class ImageClassesFunction(TableFunctionGenerator[_NoArgs]):
 
     @classmethod
     def cardinality(cls, params: BindParams[_NoArgs]) -> TableCardinality:
+        """Estimate the output row count (the model's full label set)."""
         return TableCardinality(estimate=model.NUM_CLASSES, max=model.NUM_CLASSES)
 
     @classmethod
     def process(cls, params: ProcessParams[_NoArgs], state: None, out: OutputCollector) -> None:
+        """Emit every ``(idx, label)`` the classifier can predict."""
         rows = model.class_table()
         out.emit(
             pa.RecordBatch.from_pydict(
