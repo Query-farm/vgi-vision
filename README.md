@@ -4,11 +4,19 @@
 
 <p align="center"><em>A <a href="https://query.farm">Query.Farm</a> VGI worker for DuckDB.</em></p>
 
-# vgi-vision
+# Image Classification (ImageNet) in DuckDB
 
-Image classification on image blobs, exposed as DuckDB SQL functions through
-[VGI](https://github.com/Query-farm/vgi-python). Point it at a column of image
-bytes and get ImageNet predictions back, in SQL:
+> **vgi-vision** · a [Query.Farm](https://query.farm) VGI worker · powered by ONNX Runtime
+
+A [VGI](https://query.farm) worker that brings **image classification** to
+DuckDB/SQL. Point it at a column of image bytes (`BLOB`) — or a file path — and
+get **ImageNet-1k** predictions back: a single top label per row, or the top-K
+labels with confidence scores, as plain SQL scalar and table functions.
+Inference runs out-of-process on **MobileNetV2** via
+[ONNX Runtime](https://onnxruntime.ai/) (no PyTorch); the model and labels
+download on first use and cache locally. It is built to be
+**commercial-marketplace-safe** — deliberately **no** AGPL-licensed
+Ultralytics/YOLO — so every dependency is permissively licensed.
 
 ```sql
 INSTALL vgi FROM community; LOAD vgi;
