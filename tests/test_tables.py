@@ -60,14 +60,10 @@ class TestClassify:
     def test_garbage_image_no_rows(self) -> None:
         # Hostile input through the table path: no rows, no crash. Needs no model
         # (the decode guard rejects it before inference).
-        table = invoke_table_function(
-            ClassifyFunction, positional=(pa.scalar(GARBAGE, type=pa.binary()),)
-        )
+        table = invoke_table_function(ClassifyFunction, positional=(pa.scalar(GARBAGE, type=pa.binary()),))
         assert table.column_names == ["label", "confidence"]
         assert table.num_rows == 0
 
     def test_empty_image_no_rows(self) -> None:
-        table = invoke_table_function(
-            ClassifyFunction, positional=(pa.scalar(b"", type=pa.binary()),)
-        )
+        table = invoke_table_function(ClassifyFunction, positional=(pa.scalar(b"", type=pa.binary()),))
         assert table.num_rows == 0

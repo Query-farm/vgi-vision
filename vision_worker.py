@@ -1,15 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "vgi-python",
+#     "vgi-python>=0.8.3",
 #     "onnxruntime>=1.17",
 #     "pillow>=10",
 #     "numpy>=1.26",
 #     "huggingface-hub>=0.23",
 # ]
-#
-# [tool.uv.sources]
-# vgi-python = { path = "../vgi-python" }
 # ///
 """VGI worker exposing image classification (ImageNet) to DuckDB/SQL.
 

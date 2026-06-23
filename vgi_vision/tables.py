@@ -144,9 +144,7 @@ class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs]):
         return TableCardinality(estimate=k, max=k)
 
     @classmethod
-    def process(
-        cls, params: ProcessParams[_ClassifyBlobTopKArgs], state: None, out: OutputCollector
-    ) -> None:
+    def process(cls, params: ProcessParams[_ClassifyBlobTopKArgs], state: None, out: OutputCollector) -> None:
         preds = model.classify_image(params.args.image, top_k=params.args.top_k)
         _emit_classify(preds, out, params.output_schema)
 
@@ -221,9 +219,7 @@ class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs]):
         return TableCardinality(estimate=k, max=k)
 
     @classmethod
-    def process(
-        cls, params: ProcessParams[_ClassifyPathTopKArgs], state: None, out: OutputCollector
-    ) -> None:
+    def process(cls, params: ProcessParams[_ClassifyPathTopKArgs], state: None, out: OutputCollector) -> None:
         preds = model.classify_image(_read_path(params.args.path), top_k=params.args.top_k)
         _emit_classify(preds, out, params.output_schema)
 

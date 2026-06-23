@@ -56,10 +56,7 @@ _MODEL_URL = f"https://huggingface.co/{_MODEL_HF_REPO}/resolve/main/{_MODEL_FILE
 
 # ImageNet-1k synset labels (1000 lines: "n01440764 tench, Tinca tinca").
 _LABELS_FILENAME = "synset.txt"
-_LABELS_URL = (
-    "https://raw.githubusercontent.com/onnx/models/main/"
-    "validated/vision/classification/synset.txt"
-)
+_LABELS_URL = "https://raw.githubusercontent.com/onnx/models/main/validated/vision/classification/synset.txt"
 
 # ONNX I/O: input tensor "input" (N,3,224,224) float; output "output" (N,1000) logits.
 _INPUT_SIZE = 224
@@ -162,8 +159,7 @@ def labels_path() -> Path:
             _download(_LABELS_URL, dest)
         except Exception as exc:  # noqa: BLE001
             raise ModelNotAvailableError(
-                f"Could not download ImageNet labels from {_LABELS_URL}. "
-                f"(original error: {exc})"
+                f"Could not download ImageNet labels from {_LABELS_URL}. (original error: {exc})"
             ) from exc
         return dest
 
