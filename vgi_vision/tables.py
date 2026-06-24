@@ -22,6 +22,7 @@ the worker); the per-image guard lives in :mod:`vgi_vision.model`.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Annotated, ClassVar
 
@@ -40,7 +41,9 @@ from vgi_rpc import ArrowSerializableDataclass
 from vgi_rpc.rpc import OutputCollector
 
 from . import model
-from .scalars import _read_path
+from ._examples import SAMPLE_IMAGE_BLOB
+from .meta import object_tags
+from .scalars import _SAMPLE_IMAGE_PATH, _read_path
 from .schema_utils import field
 
 _DEFAULT_TOP_K = 5
@@ -133,7 +136,7 @@ _CLASSES_SCHEMA = pa.schema(
 
 # Markdown column docs for the dynamic table-function schemas. DuckDB can't expose a
 # table function's returned columns statically, so each function advertises them via a
-# `vgi.columns_md` tag (consumed by describe/listing tooling and the metadata linter).
+# `vgi.result_columns_md` tag (consumed by describe/listing tooling and the metadata linter).
 _CLASSIFY_COLUMNS_MD = (
     "| column | type | description |\n"
     "|---|---|---|\n"
@@ -146,6 +149,121 @@ _CLASSES_COLUMNS_MD = (
     "|---|---|---|\n"
     "| `idx` | INTEGER | 0-based class index into the model's output. |\n"
     "| `label` | VARCHAR | ImageNet class label. |"
+)
+
+
+_CLASSIFY_DOC_LLM = (
+    "Explode one image into its **top-k ImageNet `(label, confidence)` predictions**, one "
+    "row per prediction, ordered confidence-descending. Use it when you want ranked "
+    "candidate labels with probabilities — not just the single best label (`top_label`) — "
+    "e.g. to show the model's top guesses, threshold on confidence, or pick among close "
+    "alternatives.\n\n"
+    "It is a *source* table function: pass the image **positionally**. Overloads resolve "
+    "by argument type and arity — `classify(image)` / `classify(image, top_k)` over a "
+    "**BLOB**, and `classify(path)` / `classify(path, top_k)` over a **VARCHAR** filesystem "
+    "path; `top_k` defaults to 5. A table-function argument cannot be a `(SELECT ...)` "
+    "subquery (DuckDB rejects it), so pass a BLOB column/literal or a path string directly. "
+    "A NULL/malformed/over-large/unreadable image emits **no rows** rather than crashing. "
+    "Returns columns `label VARCHAR` and `confidence DOUBLE` (softmax probability in [0, 1])."
+)
+
+_CLASSIFY_DOC_MD = (
+    "## `classify`\n\n"
+    "Table function returning the **top-k `(label, confidence)`** ImageNet predictions for "
+    "an image, confidence-descending.\n\n"
+    "### Overloads\n\n"
+    "- `classify(image BLOB[, top_k INTEGER])`\n"
+    "- `classify(path VARCHAR[, top_k INTEGER])` — read the image off disk first.\n\n"
+    "`top_k` defaults to 5.\n\n"
+    "### Returns\n\n"
+    "| column | type | description |\n"
+    "|---|---|---|\n"
+    "| `label` | VARCHAR | predicted ImageNet class label |\n"
+    "| `confidence` | DOUBLE | softmax probability in [0, 1] |\n\n"
+    "### Notes\n\n"
+    "A NULL/malformed image yields **no rows**. A table-function argument cannot be a "
+    "`(SELECT ...)` subquery — pass a BLOB column/literal or a path string."
+)
+
+_CLASSIFY_KEYWORDS = (
+    "classify, classification, predict, top-k, label, confidence, probability, ImageNet, "
+    "vision, ranked predictions, image labels, softmax"
+)
+
+_CLASSES_DOC_LLM = (
+    "Enumerate the classifier's **entire ImageNet-1k label set** as `(idx, label)` rows — "
+    "all 1000 classes the model can predict. Takes no arguments. Use it to discover or "
+    "validate which labels `top_label`/`classify` can return, to join predicted labels "
+    "against the canonical class list, or to populate a dropdown/lookup of recognizable "
+    "subjects. `idx` is the 0-based position into the model's output vector; `label` is the "
+    "human-readable class name. Always returns exactly 1000 rows (the model is fixed)."
+)
+
+_CLASSES_DOC_MD = (
+    "## `image_classes`\n\n"
+    "No-argument discovery table function listing **every ImageNet-1k class** the model "
+    "can predict (1000 rows).\n\n"
+    "### Returns\n\n"
+    "| column | type | description |\n"
+    "|---|---|---|\n"
+    "| `idx` | INTEGER | 0-based class index into the model output |\n"
+    "| `label` | VARCHAR | ImageNet class label |\n\n"
+    "### Notes\n\n"
+    "Useful to validate or join against predicted labels from `top_label` / `classify`."
+)
+
+_CLASSES_KEYWORDS = (
+    "image classes, labels, ImageNet, class list, vocabulary, categories, discovery, "
+    "enumerate, idx, label, 1000 classes, vision"
+)
+
+# Per-function guaranteed-runnable examples (VGI509). Self-contained: BLOB literals
+# for the BLOB overloads, the committed fixture path for the path overloads, and the
+# no-arg discovery function. expected_result omitted (execution-only check). Built with
+# ``json.dumps`` so the BLOB literal's backslash-x escapes are valid JSON (VGI507).
+_CLASSIFY_BLOB_EXAMPLES = json.dumps(
+    [
+        {
+            "description": "Top-5 (label, confidence) predictions for an image BLOB literal.",
+            "sql": f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB)",
+        }
+    ]
+)
+_CLASSIFY_BLOB_TOPK_EXAMPLES = json.dumps(
+    [
+        {
+            "description": "Top-3 (label, confidence) predictions for an image BLOB literal.",
+            "sql": f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 3)",
+        }
+    ]
+)
+_CLASSIFY_PATH_EXAMPLES = json.dumps(
+    [
+        {
+            "description": "Top-5 predictions for an image read from a filesystem path.",
+            "sql": f"SELECT * FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}')",
+        }
+    ]
+)
+_CLASSIFY_PATH_TOPK_EXAMPLES = json.dumps(
+    [
+        {
+            "description": "Top-3 predictions for an image read from a filesystem path.",
+            "sql": f"SELECT * FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}', 3)",
+        }
+    ]
+)
+_CLASSES_EXAMPLES = json.dumps(
+    [
+        {
+            "description": "Count the ImageNet classes the model can predict (1000).",
+            "sql": "SELECT count(*) AS n FROM vision.main.image_classes()",
+        },
+        {
+            "description": "Peek at the first five (idx, label) class rows.",
+            "sql": "SELECT idx, label FROM vision.main.image_classes() WHERE idx < 5 ORDER BY idx",
+        },
+    ]
 )
 
 
@@ -205,11 +323,21 @@ class ClassifyFunction(TableFunctionGenerator[_ClassifyBlobArgs, ScanState]):
         name = "classify"
         description = "Top-5 ImageNet predictions (label, confidence) for an image BLOB"
         categories = ["vision", "classification"]
-        tags = {"vgi.columns_md": _CLASSIFY_COLUMNS_MD}
+        tags = {
+            **object_tags(
+                title="Classify Image (BLOB, top-5)",
+                doc_llm=_CLASSIFY_DOC_LLM,
+                doc_md=_CLASSIFY_DOC_MD,
+                keywords=_CLASSIFY_KEYWORDS,
+                relative_path="vgi_vision/tables.py",
+            ),
+            "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
+            "vgi.executable_examples": _CLASSIFY_BLOB_EXAMPLES,
+        }
         examples = [
             FunctionExample(
-                sql="SELECT * FROM vision.classify((SELECT image FROM photos LIMIT 1))",
-                description="Top-5 predictions for an image",
+                sql=f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB)",
+                description="Top-5 predictions for an image BLOB literal",
             ),
         ]
 
@@ -244,11 +372,21 @@ class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs, ScanSta
         name = "classify"
         description = "Top-k ImageNet predictions (label, confidence) for an image BLOB"
         categories = ["vision", "classification"]
-        tags = {"vgi.columns_md": _CLASSIFY_COLUMNS_MD}
+        tags = {
+            **object_tags(
+                title="Classify Image (BLOB, top-k)",
+                doc_llm=_CLASSIFY_DOC_LLM,
+                doc_md=_CLASSIFY_DOC_MD,
+                keywords=_CLASSIFY_KEYWORDS,
+                relative_path="vgi_vision/tables.py",
+            ),
+            "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
+            "vgi.executable_examples": _CLASSIFY_BLOB_TOPK_EXAMPLES,
+        }
         examples = [
             FunctionExample(
-                sql="SELECT * FROM vision.classify((SELECT image FROM photos LIMIT 1), 10)",
-                description="Top-10 predictions for an image",
+                sql=f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 10)",
+                description="Top-10 predictions for an image BLOB literal",
             ),
         ]
 
@@ -300,10 +438,20 @@ class ClassifyPathFunction(TableFunctionGenerator[_ClassifyPathArgs, ScanState])
         name = "classify"
         description = "Top-5 ImageNet predictions for an image file path"
         categories = ["vision", "classification"]
-        tags = {"vgi.columns_md": _CLASSIFY_COLUMNS_MD}
+        tags = {
+            **object_tags(
+                title="Classify Image (File Path, top-5)",
+                doc_llm=_CLASSIFY_DOC_LLM,
+                doc_md=_CLASSIFY_DOC_MD,
+                keywords=_CLASSIFY_KEYWORDS,
+                relative_path="vgi_vision/tables.py",
+            ),
+            "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
+            "vgi.executable_examples": _CLASSIFY_PATH_EXAMPLES,
+        }
         examples = [
             FunctionExample(
-                sql="SELECT * FROM vision.classify('/tmp/cat.jpg')",
+                sql=f"SELECT * FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}')",
                 description="Top-5 predictions for an image on disk",
             ),
         ]
@@ -339,10 +487,20 @@ class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs, Sca
         name = "classify"
         description = "Top-k ImageNet predictions for an image file path"
         categories = ["vision", "classification"]
-        tags = {"vgi.columns_md": _CLASSIFY_COLUMNS_MD}
+        tags = {
+            **object_tags(
+                title="Classify Image (File Path, top-k)",
+                doc_llm=_CLASSIFY_DOC_LLM,
+                doc_md=_CLASSIFY_DOC_MD,
+                keywords=_CLASSIFY_KEYWORDS,
+                relative_path="vgi_vision/tables.py",
+            ),
+            "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
+            "vgi.executable_examples": _CLASSIFY_PATH_TOPK_EXAMPLES,
+        }
         examples = [
             FunctionExample(
-                sql="SELECT * FROM vision.classify('/tmp/cat.jpg', 10)",
+                sql=f"SELECT * FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}', 10)",
                 description="Top-10 predictions for an image on disk",
             ),
         ]
@@ -389,10 +547,20 @@ class ImageClassesFunction(TableFunctionGenerator[_NoArgs, ScanState]):
         name = "image_classes"
         description = "The model's ImageNet label set: (idx, label), 1000 rows"
         categories = ["vision", "classification"]
-        tags = {"vgi.columns_md": _CLASSES_COLUMNS_MD}
+        tags = {
+            **object_tags(
+                title="ImageNet Class List",
+                doc_llm=_CLASSES_DOC_LLM,
+                doc_md=_CLASSES_DOC_MD,
+                keywords=_CLASSES_KEYWORDS,
+                relative_path="vgi_vision/tables.py",
+            ),
+            "vgi.result_columns_md": _CLASSES_COLUMNS_MD,
+            "vgi.executable_examples": _CLASSES_EXAMPLES,
+        }
         examples = [
             FunctionExample(
-                sql="SELECT count(*) FROM vision.image_classes()",
+                sql="SELECT count(*) AS n FROM vision.main.image_classes()",
                 description="How many classes the model predicts (1000)",
             ),
         ]
