@@ -11,18 +11,32 @@ statement ok
 ATTACH 'vision' AS vision (TYPE vgi, LOCATION '${VGI_VISION_WORKER}');
 
 # ---- image_classes(): the model's full ImageNet label set ----
+# 1000 rows is well over one producer batch, so over the http transport this
+# result is paged across continuation tokens. If the scan cursor (ScanState.offset)
+# did not survive each continuation boundary, the http leg would loop forever
+# (re-emitting from row 0) or truncate -- so this is a live regression test for the
+# HTTP-continuation cursor, exercised on every transport.
 
 query I
 SELECT count(*) FROM vision.image_classes();
 ----
 1000
 
-# Indices are 0..999, dense.
+# Indices are 0..999, dense -- every row emitted exactly once, no dupes, no gaps.
+# (A broken cursor that re-paged from 0 would inflate the count / break DISTINCT.)
 query I
-SELECT count(DISTINCT idx) = 1000 AND min(idx) = 0 AND max(idx) = 999
+SELECT count(DISTINCT idx) = 1000 AND min(idx) = 0 AND max(idx) = 999 AND count(*) = 1000
 FROM vision.image_classes();
 ----
 true
+
+# Ordered head well past the first producer batch: idx=500 is reachable only if
+# the cursor paged correctly across the http continuation boundary.
+query II
+SELECT idx, (label IS NOT NULL AND length(label) > 0) FROM vision.image_classes()
+ORDER BY idx LIMIT 1 OFFSET 500;
+----
+500	true
 
 # ---- top_label(image): #1 prediction for the committed sample.png ----
 

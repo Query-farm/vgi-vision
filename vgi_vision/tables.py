@@ -36,6 +36,7 @@ from vgi.table_function import (
     bind_fixed_schema,
     init_single_worker,
 )
+from vgi_rpc import ArrowSerializableDataclass
 from vgi_rpc.rpc import OutputCollector
 
 from . import model
@@ -43,6 +44,78 @@ from .scalars import _read_path
 from .schema_utils import field
 
 _DEFAULT_TOP_K = 5
+
+# Rows emitted per process() tick. Bounded so the scan cursor (``offset``) is
+# observable across the HTTP limit-1 continuation boundary: correctness no longer
+# depends on the whole result fitting inside a single producer batch. See
+# ScanState below and CLAUDE.md "HTTP continuation" for the why.
+ROWS_PER_TICK = 64
+
+
+@dataclass(kw_only=True)
+class ScanState(ArrowSerializableDataclass):
+    """Externalized scan cursor for the vision table functions.
+
+    Over the stateless HTTP transport the framework wire-serializes a producer's
+    per-scan state through a continuation token after each ``process()`` tick (the
+    client returns it; the worker resumes by deserializing it). A position-less
+    state that emits *all* rows in one ``out.emit()`` and finishes therefore
+    restarts from row 0 on every HTTP resume and loops forever once the output
+    exceeds one producer batch. Carrying an explicit cursor here fixes that.
+
+    Fields (all wire-serialize through the continuation token):
+
+    * ``started`` -- flips once the (possibly heavy) source has been read and the
+      full result batch materialized into ``rows_ipc``. Distinguishes
+      "not yet computed" from "computed an empty result".
+    * ``offset`` -- index of the next unemitted row; advanced at each emit.
+    * ``rows_ipc`` -- the full materialized result as Arrow IPC stream bytes.
+    """
+
+    started: bool = False
+    offset: int = 0
+    rows_ipc: bytes = b""
+
+
+def result_to_ipc(batch: pa.RecordBatch) -> bytes:
+    """Serialize a single RecordBatch to Arrow IPC stream bytes (for ScanState)."""
+    sink = pa.BufferOutputStream()
+    with pa.ipc.new_stream(sink, batch.schema) as writer:  # type: ignore[no-untyped-call]
+        writer.write_batch(batch)
+    result: bytes = sink.getvalue().to_pybytes()
+    return result
+
+
+def ipc_to_table(value: bytes) -> pa.Table:
+    """Deserialize Arrow IPC stream bytes (from ScanState) back to a Table."""
+    reader = pa.ipc.open_stream(pa.BufferReader(value))  # type: ignore[no-untyped-call]
+    return reader.read_all()
+
+
+def _emit_cursor(state: ScanState, out: OutputCollector, schema: pa.Schema) -> None:
+    """Emit one bounded ``ROWS_PER_TICK`` slice from ``state.offset``; finish when drained.
+
+    ``state.started`` must already be set (``rows_ipc`` materialized). Advances
+    ``state.offset`` past the emitted slice so a resumed tick (post wire round-trip)
+    sees the new position and never re-emits row 0. An empty/zero-row result
+    finishes immediately (``0 >= 0``).
+    """
+    table = ipc_to_table(state.rows_ipc)
+    total = table.num_rows
+    if state.offset >= total:
+        out.finish()
+        return
+    end = min(state.offset + ROWS_PER_TICK, total)
+    chunk = table.slice(state.offset, end - state.offset)
+    # Advance the cursor BEFORE emitting: over http, emit() may suspend the tick
+    # (limit-1 continuation boundary) and the framework wire-serializes the state
+    # as it stands -- the advanced offset must already be recorded so the resumed
+    # tick continues past this slice instead of re-emitting it.
+    state.offset = end
+    out.emit(chunk.combine_chunks().to_batches()[0])
+    if state.offset >= total:
+        out.finish()
+
 
 _CLASSIFY_SCHEMA = pa.schema(
     [
@@ -59,19 +132,30 @@ _CLASSES_SCHEMA = pa.schema(
 )
 
 
-def _emit_classify(preds: list[tuple[str, float]] | None, out: OutputCollector, schema: pa.Schema) -> None:
-    """Emit one row per prediction (or nothing for a NULL/unclassifiable image)."""
+def _classify_batch(preds: list[tuple[str, float]] | None, schema: pa.Schema) -> pa.RecordBatch:
+    """Build the full ``(label, confidence)`` batch for a set of predictions.
+
+    A NULL/unclassifiable image (``preds`` is ``None``/empty) yields a zero-row
+    batch -- the cursor then finishes with no rows, preserving the early-out
+    contract. The cursor (not this helper) does the emit/finish.
+    """
     if not preds:
-        out.emit(pa.RecordBatch.from_pydict({"label": [], "confidence": []}, schema=schema))
-        out.finish()
-        return
-    out.emit(
-        pa.RecordBatch.from_pydict(
-            {"label": [p[0] for p in preds], "confidence": [p[1] for p in preds]},
-            schema=schema,
-        )
+        return pa.RecordBatch.from_pydict({"label": [], "confidence": []}, schema=schema)
+    return pa.RecordBatch.from_pydict(
+        {"label": [p[0] for p in preds], "confidence": [p[1] for p in preds]},
+        schema=schema,
     )
-    out.finish()
+
+
+def _process_classify(
+    state: ScanState, out: OutputCollector, schema: pa.Schema, preds: list[tuple[str, float]] | None
+) -> None:
+    """Cursor-driven classify tick: materialize predictions on the first tick, then stream slices."""
+    if not state.started:
+        state.rows_ipc = result_to_ipc(_classify_batch(preds, schema))
+        state.started = True
+        state.offset = 0
+    _emit_cursor(state, out, schema)
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +176,7 @@ class _ClassifyBlobTopKArgs:
 
 @init_single_worker
 @bind_fixed_schema
-class ClassifyFunction(TableFunctionGenerator[_ClassifyBlobArgs]):
+class ClassifyFunction(TableFunctionGenerator[_ClassifyBlobArgs, ScanState]):
     """``classify(image)`` -- top-5 ImageNet predictions, confidence descending."""
 
     FunctionArguments = _ClassifyBlobArgs
@@ -117,15 +201,20 @@ class ClassifyFunction(TableFunctionGenerator[_ClassifyBlobArgs]):
         return TableCardinality(estimate=_DEFAULT_TOP_K, max=_DEFAULT_TOP_K)
 
     @classmethod
-    def process(cls, params: ProcessParams[_ClassifyBlobArgs], state: None, out: OutputCollector) -> None:
-        """Classify the image BLOB and emit the top-5 predictions."""
-        preds = model.classify_image(params.args.image, top_k=_DEFAULT_TOP_K)
-        _emit_classify(preds, out, params.output_schema)
+    def initial_state(cls, params: ProcessParams[_ClassifyBlobArgs]) -> ScanState:
+        """Fresh scan cursor for this image's predictions."""
+        return ScanState()
+
+    @classmethod
+    def process(cls, params: ProcessParams[_ClassifyBlobArgs], state: ScanState, out: OutputCollector) -> None:
+        """Classify the image BLOB and stream the top-5 predictions via the cursor."""
+        preds = None if state.started else model.classify_image(params.args.image, top_k=_DEFAULT_TOP_K)
+        _process_classify(state, out, params.output_schema, preds)
 
 
 @init_single_worker
 @bind_fixed_schema
-class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs]):
+class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs, ScanState]):
     """``classify(image, top_k)`` -- top-k ImageNet predictions, confidence desc."""
 
     FunctionArguments = _ClassifyBlobTopKArgs
@@ -151,10 +240,15 @@ class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs]):
         return TableCardinality(estimate=k, max=k)
 
     @classmethod
-    def process(cls, params: ProcessParams[_ClassifyBlobTopKArgs], state: None, out: OutputCollector) -> None:
-        """Classify the image BLOB and emit the top-k predictions."""
-        preds = model.classify_image(params.args.image, top_k=params.args.top_k)
-        _emit_classify(preds, out, params.output_schema)
+    def initial_state(cls, params: ProcessParams[_ClassifyBlobTopKArgs]) -> ScanState:
+        """Fresh scan cursor for this image's predictions."""
+        return ScanState()
+
+    @classmethod
+    def process(cls, params: ProcessParams[_ClassifyBlobTopKArgs], state: ScanState, out: OutputCollector) -> None:
+        """Classify the image BLOB and stream the top-k predictions via the cursor."""
+        preds = None if state.started else model.classify_image(params.args.image, top_k=params.args.top_k)
+        _process_classify(state, out, params.output_schema, preds)
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +269,7 @@ class _ClassifyPathTopKArgs:
 
 @init_single_worker
 @bind_fixed_schema
-class ClassifyPathFunction(TableFunctionGenerator[_ClassifyPathArgs]):
+class ClassifyPathFunction(TableFunctionGenerator[_ClassifyPathArgs, ScanState]):
     """``classify(path)`` -- top-5 predictions for an image read off disk."""
 
     FunctionArguments = _ClassifyPathArgs
@@ -200,15 +294,20 @@ class ClassifyPathFunction(TableFunctionGenerator[_ClassifyPathArgs]):
         return TableCardinality(estimate=_DEFAULT_TOP_K, max=_DEFAULT_TOP_K)
 
     @classmethod
-    def process(cls, params: ProcessParams[_ClassifyPathArgs], state: None, out: OutputCollector) -> None:
-        """Read the image off disk, classify it, and emit the top-5 predictions."""
-        preds = model.classify_image(_read_path(params.args.path), top_k=_DEFAULT_TOP_K)
-        _emit_classify(preds, out, params.output_schema)
+    def initial_state(cls, params: ProcessParams[_ClassifyPathArgs]) -> ScanState:
+        """Fresh scan cursor for this image's predictions."""
+        return ScanState()
+
+    @classmethod
+    def process(cls, params: ProcessParams[_ClassifyPathArgs], state: ScanState, out: OutputCollector) -> None:
+        """Read the image off disk, classify it, and stream the top-5 predictions via the cursor."""
+        preds = None if state.started else model.classify_image(_read_path(params.args.path), top_k=_DEFAULT_TOP_K)
+        _process_classify(state, out, params.output_schema, preds)
 
 
 @init_single_worker
 @bind_fixed_schema
-class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs]):
+class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs, ScanState]):
     """``classify(path, top_k)`` -- top-k predictions for an image read off disk."""
 
     FunctionArguments = _ClassifyPathTopKArgs
@@ -234,10 +333,15 @@ class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs]):
         return TableCardinality(estimate=k, max=k)
 
     @classmethod
-    def process(cls, params: ProcessParams[_ClassifyPathTopKArgs], state: None, out: OutputCollector) -> None:
-        """Read the image off disk, classify it, and emit the top-k predictions."""
-        preds = model.classify_image(_read_path(params.args.path), top_k=params.args.top_k)
-        _emit_classify(preds, out, params.output_schema)
+    def initial_state(cls, params: ProcessParams[_ClassifyPathTopKArgs]) -> ScanState:
+        """Fresh scan cursor for this image's predictions."""
+        return ScanState()
+
+    @classmethod
+    def process(cls, params: ProcessParams[_ClassifyPathTopKArgs], state: ScanState, out: OutputCollector) -> None:
+        """Read the image off disk, classify it, and stream the top-k predictions via the cursor."""
+        preds = None if state.started else model.classify_image(_read_path(params.args.path), top_k=params.args.top_k)
+        _process_classify(state, out, params.output_schema, preds)
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +356,7 @@ class _NoArgs:
 
 @init_single_worker
 @bind_fixed_schema
-class ImageClassesFunction(TableFunctionGenerator[_NoArgs]):
+class ImageClassesFunction(TableFunctionGenerator[_NoArgs, ScanState]):
     """``image_classes()`` -- every ``(idx, label)`` the classifier can predict."""
 
     FunctionArguments = _NoArgs
@@ -277,16 +381,29 @@ class ImageClassesFunction(TableFunctionGenerator[_NoArgs]):
         return TableCardinality(estimate=model.NUM_CLASSES, max=model.NUM_CLASSES)
 
     @classmethod
-    def process(cls, params: ProcessParams[_NoArgs], state: None, out: OutputCollector) -> None:
-        """Emit every ``(idx, label)`` the classifier can predict."""
-        rows = model.class_table()
-        out.emit(
-            pa.RecordBatch.from_pydict(
+    def initial_state(cls, params: ProcessParams[_NoArgs]) -> ScanState:
+        """Fresh scan cursor for the label-set enumeration."""
+        return ScanState()
+
+    @classmethod
+    def process(cls, params: ProcessParams[_NoArgs], state: ScanState, out: OutputCollector) -> None:
+        """Stream every ``(idx, label)`` the classifier can predict, ``ROWS_PER_TICK`` at a time.
+
+        The label set is ~1000 rows -- well over one producer batch -- so the cursor
+        is *required*: on the first tick we materialize the full table into
+        ``state.rows_ipc``, then emit bounded slices so the offset survives each HTTP
+        continuation round-trip.
+        """
+        if not state.started:
+            rows = model.class_table()
+            batch = pa.RecordBatch.from_pydict(
                 {"idx": [r[0] for r in rows], "label": [r[1] for r in rows]},
                 schema=params.output_schema,
             )
-        )
-        out.finish()
+            state.rows_ipc = result_to_ipc(batch)
+            state.started = True
+            state.offset = 0
+        _emit_cursor(state, out, params.output_schema)
 
 
 TABLE_FUNCTIONS: list[type] = [

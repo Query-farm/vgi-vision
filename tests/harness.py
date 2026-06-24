@@ -10,6 +10,7 @@ Adapted from the vgi-conform / vgi-nlp worker test suites.
 
 from __future__ import annotations
 
+import contextlib
 import io
 from typing import Any
 
@@ -71,12 +72,24 @@ def test_storage() -> FunctionStorage:
 
 
 class MockOutputCollector:
-    """Captures emitted batches for assertions."""
+    """Captures emitted batches for assertions.
 
-    def __init__(self, output_schema: pa.Schema) -> None:
+    ``batch_limit`` models the HTTP transport's per-response producer batch limit:
+    once that many batches have been emitted in a single ``process()`` tick, further
+    emits raise ``_BatchLimitReached`` so the driver can suspend, wire-serialize the
+    state, and resume (exactly as the http server does across a continuation token).
+    ``None`` (the default) means unbounded -- the in-process behaviour.
+    """
+
+    def __init__(self, output_schema: pa.Schema, batch_limit: int | None = None) -> None:
         self.output_schema = output_schema
         self.batches: list[pa.RecordBatch] = []
         self._finished = False
+        self._batch_limit = batch_limit
+        self._emitted_this_tick = 0
+
+    def begin_tick(self) -> None:
+        self._emitted_this_tick = 0
 
     def emit(
         self,
@@ -85,6 +98,9 @@ class MockOutputCollector:
         metadata: dict[str, str] | None = None,
     ) -> None:
         self.batches.append(batch)
+        self._emitted_this_tick += 1
+        if self._batch_limit is not None and self._emitted_this_tick >= self._batch_limit:
+            raise _BatchLimitReached
 
     def finish(self) -> None:
         self._finished = True
@@ -97,13 +113,30 @@ class MockOutputCollector:
         pass
 
 
+class _BatchLimitReached(Exception):
+    """Internal: the per-tick producer batch limit was hit; suspend + resume."""
+
+
 def invoke_table_function(
     func_cls: type,
     *,
     named: dict[str, pa.Scalar] | None = None,
     positional: tuple[pa.Scalar, ...] = (),
+    serialize_state: bool = False,
+    max_ticks: int = 1000,
 ) -> pa.Table:
-    """Run a (source) table function through bind -> init -> process -> table."""
+    """Run a (source) table function through bind -> init -> process -> table.
+
+    When ``serialize_state=True`` the driver faithfully models the stateless HTTP
+    transport: each ``process()`` tick may emit at most ONE producer batch (the
+    limit-1 continuation boundary), after which the per-scan state is wire-
+    serialized and deserialized
+    (``type(state).deserialize_from_bytes(state.serialize_to_bytes())``) before the
+    next tick resumes. A position-less state that re-emits row 0 on every resume
+    loops forever; the ``max_ticks`` guard turns that into a loud failure instead
+    of an infinite hang. With a cursor state the offset survives each round-trip
+    and the scan terminates after ~ceil(rows / ROWS_PER_TICK) ticks.
+    """
     args = Arguments(positional=positional, named=named or {})
 
     bind_req = BindRequest(
@@ -128,9 +161,26 @@ def invoke_table_function(
     )
 
     state = func_cls.initial_state(params)
-    out = MockOutputCollector(bind_resp.output_schema)
+    # Over http, each response carries at most one producer batch; model that with
+    # batch_limit=1 so the cursor must be observable across the boundary.
+    out = MockOutputCollector(bind_resp.output_schema, batch_limit=1 if serialize_state else None)
 
+    ticks = 0
     while not out.finished:
-        func_cls.process(params, state, out)
+        if serialize_state and state is not None:
+            state = type(state).deserialize_from_bytes(state.serialize_to_bytes())
+        out.begin_tick()
+        # _BatchLimitReached suspends the tick mid-flight exactly as the http server
+        # does once it has filled a response with one batch; the loop then resumes
+        # with the (serialized) state.
+        with contextlib.suppress(_BatchLimitReached):
+            func_cls.process(params, state, out)
+        ticks += 1
+        if ticks > max_ticks:
+            raise AssertionError(
+                f"{func_cls.__name__} did not finish after {max_ticks} ticks "
+                f"(serialize_state={serialize_state}): the scan cursor is not "
+                f"surviving the continuation boundary (likely re-emitting from row 0)."
+            )
 
     return pa.Table.from_batches(out.batches, schema=bind_resp.output_schema)
