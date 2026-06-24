@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "vgi-python[http]>=0.8.3",
+#     "vgi-python[http]>=0.8.4",
 #     "onnxruntime>=1.17",
 #     "pillow>=10",
 #     "numpy>=1.26",
@@ -42,13 +42,63 @@ from vgi_vision import model
 from vgi_vision.scalars import SCALAR_FUNCTIONS
 from vgi_vision.tables import TABLE_FUNCTIONS
 
+_CATALOG_DESCRIPTION_LLM = (
+    "Run image classification on image blobs (or image file paths) directly in SQL. "
+    "Given the raw bytes of a PNG/JPEG/etc. image, returns ImageNet-1k labels: the single "
+    "most likely label (`top_label`), the top-k (label, confidence) predictions "
+    "(`classify`), or the model's full 1000-class label set (`image_classes`). The "
+    "classifier is a permissively-licensed MobileNetV2 ONNX model. Use it to tag, filter, "
+    "or group images by what they depict — e.g. find photos of cats, label a column of "
+    "image blobs, or rank an image's most probable subjects."
+)
+
+_CATALOG_DESCRIPTION_MD = (
+    "# vision\n\n"
+    "Image classification (ImageNet-1k) on image blobs as DuckDB SQL functions, via VGI. "
+    "Inference runs out-of-process on a permissively-licensed MobileNetV2 ONNX model "
+    "(Apache-2.0 weights) through onnxruntime.\n\n"
+    "- **`top_label(image)` / `top_label(path)`** — scalar: the #1 predicted label per row.\n"
+    "- **`classify(image[, top_k])` / `classify(path[, top_k])`** — table: top-k "
+    "`(label, confidence)` predictions, confidence descending.\n"
+    "- **`image_classes()`** — table: the model's full `(idx, label)` label set (1000 rows).\n\n"
+    "Untrusted/malformed images yield SQL NULL (or no rows), never a crash."
+)
+
+_SCHEMA_DESCRIPTION_LLM = (
+    "Image-classification functions over image blobs and file paths: predict the top "
+    "ImageNet label (`top_label`), the top-k (label, confidence) predictions (`classify`), "
+    "and enumerate the model's class set (`image_classes`)."
+)
+
+_SCHEMA_DESCRIPTION_MD = (
+    "Image-classification functions: `top_label` (scalar), `classify` (table), and "
+    "`image_classes` (table) over a MobileNetV2 ImageNet-1k ONNX model."
+)
+
+_CATALOG_TAGS = {
+    "vgi.description_llm": _CATALOG_DESCRIPTION_LLM,
+    "vgi.description_md": _CATALOG_DESCRIPTION_MD,
+    "vgi.author": "Query.Farm",
+    "vgi.copyright": "Copyright 2026 Query Farm LLC - https://query.farm",
+    "vgi.license": "MIT",
+    "vgi.support_contact": "https://github.com/Query-farm/vgi-vision/issues",
+    "vgi.support_policy_url": "https://github.com/Query-farm/vgi-vision/blob/main/README.md",
+}
+
 _VISION_CATALOG = Catalog(
     name="vision",
     default_schema="main",
+    comment="Image classification (ImageNet) on image blobs and file paths for SQL.",
+    source_url="https://github.com/Query-farm/vgi-vision",
+    tags=_CATALOG_TAGS,
     schemas=[
         Schema(
             name="main",
             comment="Image classification (ImageNet) on image blobs for SQL",
+            tags={
+                "vgi.description_llm": _SCHEMA_DESCRIPTION_LLM,
+                "vgi.description_md": _SCHEMA_DESCRIPTION_MD,
+            },
             functions=[*SCALAR_FUNCTIONS, *TABLE_FUNCTIONS],
         ),
     ],
