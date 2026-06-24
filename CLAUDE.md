@@ -59,6 +59,46 @@ only), and overloads resolve by **arity + type**:
 LIST/STRUCT-style fixed schemas use `bind_fixed_schema` + `FIXED_SCHEMA` and the
 `field()` helper for column comments.
 
+## Scan state is an explicit cursor — the HTTP-continuation contract
+
+All five table functions are `TableFunctionGenerator[Args, ScanState]` (in
+`tables.py`), **not** `state: None`. `ScanState(ArrowSerializableDataclass)` carries
+`started: bool`, `offset: int`, `rows_ipc: bytes` (the full result as Arrow IPC
+bytes via `result_to_ipc`/`ipc_to_table`), and a module constant
+`ROWS_PER_TICK = 64`.
+
+**Why a cursor and not emit-all.** Over the stateless **http** transport the
+framework round-trips the producer's per-scan state through a *continuation token*:
+after each `process()` tick it wire-serializes the state
+(`ArrowSerializableDataclass.serialize_to_bytes()`), the client returns it, and the
+worker resumes by deserializing it — emitting **at most one producer batch per
+response**. A position-less `state: None` function that did
+`out.emit(...all rows...); out.finish()` restarts from row 0 on every http resume
+and **loops forever** once the result exceeds one batch. subprocess/unix keep the
+live state in-process so they hide the bug; only http (and the
+serialize-between-ticks unit test) expose it. `image_classes()` = 1000 rows is the
+smoking gun — if the http leg times out, the cursor is wrong.
+
+**The contract.** Each `process()` tick: on the first tick (`not state.started`)
+read the source and materialize the full output batch into `state.rows_ipc` (set
+`started`); then emit one bounded `ROWS_PER_TICK` slice from `state.offset`,
+**advance `state.offset` before `out.emit()`** (so a tick suspended at the limit-1
+boundary serializes the already-advanced offset), and `out.finish()` once
+`offset >= total`. The NULL/empty-image early-out is preserved: a `None`/empty image
+materializes a zero-row batch and finishes immediately (`0 >= 0`). The shared
+`_emit_cursor` helper does the slicing; `_classify_batch` builds the full classify
+batch. Rows/schema are byte-identical to the old emit-all behaviour.
+
+The regression test lives in `tests/test_tables.py`
+(`TestScanStateRoundTrip`/`TestCursorSurvivesContinuation`): the test harness
+`invoke_table_function(..., serialize_state=True)` models http by capping each tick
+to one producer batch and wire-serializing `ScanState` between every tick, with a
+1000-tick guard. On the old emit-all/`None` code it overruns the guard (re-emits
+row 0); on the cursor code it terminates with each row emitted once. The
+model-gated `image_classes` round-trips the 1000-row label set; an offline classify
+variant monkeypatches `model.classify_image` to return ~200 synthetic preds so the
+regression is covered without the ONNX weights.
+
 ## Sharp edges (learned the hard way)
 
 1. **`haybarn-unittest` skips `require vgi`** — under haybarn the extension is
