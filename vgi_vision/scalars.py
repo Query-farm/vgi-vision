@@ -66,10 +66,19 @@ _TOP_LABEL_DOC_MD = (
     "use the `classify` table function."
 )
 
-_TOP_LABEL_KEYWORDS = (
-    "top label, classify, predict, image label, ImageNet, tag image, most likely class, "
-    "scalar, vision, top_label, label image"
-)
+_TOP_LABEL_KEYWORDS = [
+    "top label",
+    "classify",
+    "predict",
+    "image label",
+    "ImageNet",
+    "tag image",
+    "most likely class",
+    "scalar",
+    "vision",
+    "top_label",
+    "label image",
+]
 
 # Built with ``json.dumps`` so the BLOB literal's backslash-x escapes are correctly
 # JSON-escaped (raw ``\x`` is invalid JSON; VGI507).
@@ -120,7 +129,6 @@ class TopLabelFunction(ScalarFunction):
                 doc_llm=_TOP_LABEL_DOC_LLM,
                 doc_md=_TOP_LABEL_DOC_MD,
                 keywords=_TOP_LABEL_KEYWORDS,
-                relative_path="vgi_vision/scalars.py",
             ),
             "vgi.executable_examples": _TOP_LABEL_BLOB_EXAMPLES,
         }
@@ -155,7 +163,6 @@ class TopLabelPathFunction(ScalarFunction):
                 doc_llm=_TOP_LABEL_DOC_LLM,
                 doc_md=_TOP_LABEL_DOC_MD,
                 keywords=_TOP_LABEL_KEYWORDS,
-                relative_path="vgi_vision/scalars.py",
             ),
             "vgi.executable_examples": _TOP_LABEL_PATH_EXAMPLES,
         }

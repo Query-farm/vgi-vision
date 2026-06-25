@@ -185,10 +185,20 @@ _CLASSIFY_DOC_MD = (
     "`(SELECT ...)` subquery — pass a BLOB column/literal or a path string."
 )
 
-_CLASSIFY_KEYWORDS = (
-    "classify, classification, predict, top-k, label, confidence, probability, ImageNet, "
-    "vision, ranked predictions, image labels, softmax"
-)
+_CLASSIFY_KEYWORDS = [
+    "classify",
+    "classification",
+    "predict",
+    "top-k",
+    "label",
+    "confidence",
+    "probability",
+    "ImageNet",
+    "vision",
+    "ranked predictions",
+    "image labels",
+    "softmax",
+]
 
 _CLASSES_DOC_LLM = (
     "Enumerate the classifier's **entire ImageNet-1k label set** as `(idx, label)` rows — "
@@ -212,10 +222,20 @@ _CLASSES_DOC_MD = (
     "Useful to validate or join against predicted labels from `top_label` / `classify`."
 )
 
-_CLASSES_KEYWORDS = (
-    "image classes, labels, ImageNet, class list, vocabulary, categories, discovery, "
-    "enumerate, idx, label, 1000 classes, vision"
-)
+_CLASSES_KEYWORDS = [
+    "image classes",
+    "labels",
+    "ImageNet",
+    "class list",
+    "vocabulary",
+    "categories",
+    "discovery",
+    "enumerate",
+    "idx",
+    "label",
+    "1000 classes",
+    "vision",
+]
 
 # Per-function guaranteed-runnable examples (VGI509). Self-contained: BLOB literals
 # for the BLOB overloads, the committed fixture path for the path overloads, and the
@@ -329,7 +349,6 @@ class ClassifyFunction(TableFunctionGenerator[_ClassifyBlobArgs, ScanState]):
                 doc_llm=_CLASSIFY_DOC_LLM,
                 doc_md=_CLASSIFY_DOC_MD,
                 keywords=_CLASSIFY_KEYWORDS,
-                relative_path="vgi_vision/tables.py",
             ),
             "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
             "vgi.executable_examples": _CLASSIFY_BLOB_EXAMPLES,
@@ -378,7 +397,6 @@ class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs, ScanSta
                 doc_llm=_CLASSIFY_DOC_LLM,
                 doc_md=_CLASSIFY_DOC_MD,
                 keywords=_CLASSIFY_KEYWORDS,
-                relative_path="vgi_vision/tables.py",
             ),
             "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
             "vgi.executable_examples": _CLASSIFY_BLOB_TOPK_EXAMPLES,
@@ -444,7 +462,6 @@ class ClassifyPathFunction(TableFunctionGenerator[_ClassifyPathArgs, ScanState])
                 doc_llm=_CLASSIFY_DOC_LLM,
                 doc_md=_CLASSIFY_DOC_MD,
                 keywords=_CLASSIFY_KEYWORDS,
-                relative_path="vgi_vision/tables.py",
             ),
             "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
             "vgi.executable_examples": _CLASSIFY_PATH_EXAMPLES,
@@ -493,7 +510,6 @@ class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs, Sca
                 doc_llm=_CLASSIFY_DOC_LLM,
                 doc_md=_CLASSIFY_DOC_MD,
                 keywords=_CLASSIFY_KEYWORDS,
-                relative_path="vgi_vision/tables.py",
             ),
             "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
             "vgi.executable_examples": _CLASSIFY_PATH_TOPK_EXAMPLES,
@@ -553,7 +569,6 @@ class ImageClassesFunction(TableFunctionGenerator[_NoArgs, ScanState]):
                 doc_llm=_CLASSES_DOC_LLM,
                 doc_md=_CLASSES_DOC_MD,
                 keywords=_CLASSES_KEYWORDS,
-                relative_path="vgi_vision/tables.py",
             ),
             "vgi.result_columns_md": _CLASSES_COLUMNS_MD,
             "vgi.executable_examples": _CLASSES_EXAMPLES,

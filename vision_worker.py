@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "vgi-python[http]>=0.8.4",
+#     "vgi-python[http]>=0.8.5",
 #     "onnxruntime>=1.17",
 #     "pillow>=10",
 #     "numpy>=1.26",
@@ -37,20 +37,34 @@ import json
 from typing import Any
 
 from vgi import Worker
-from vgi.catalog import Catalog, Schema
+from vgi.catalog import Catalog, Schema, View
 
 from vgi_vision import model
 from vgi_vision._examples import SAMPLE_IMAGE_BLOB
+from vgi_vision.meta import keywords_json
 from vgi_vision.scalars import SCALAR_FUNCTIONS
 from vgi_vision.tables import TABLE_FUNCTIONS
 
 _CATALOG_TITLE = "Image Classification (ImageNet)"
 
-_CATALOG_KEYWORDS = (
-    "image classification, vision, ImageNet, label, classify, computer vision, "
-    "onnx, mobilenet, image tagging, predict, top_label, image_classes, photo, "
-    "object recognition, machine learning, inference"
-)
+_CATALOG_KEYWORDS = [
+    "image classification",
+    "vision",
+    "ImageNet",
+    "label",
+    "classify",
+    "computer vision",
+    "onnx",
+    "mobilenet",
+    "image tagging",
+    "predict",
+    "top_label",
+    "image_classes",
+    "photo",
+    "object recognition",
+    "machine learning",
+    "inference",
+]
 
 _CATALOG_DOC_LLM = (
     "Run image classification on image blobs (or image file paths) directly in SQL. "
@@ -83,10 +97,20 @@ _CATALOG_DOC_MD = (
 
 _SCHEMA_TITLE = "Vision — main schema"
 
-_SCHEMA_KEYWORDS = (
-    "image classification, top_label, classify, image_classes, ImageNet, vision, "
-    "label, confidence, onnx, mobilenet, blob, file path"
-)
+_SCHEMA_KEYWORDS = [
+    "image classification",
+    "top_label",
+    "classify",
+    "image_classes",
+    "ImageNet",
+    "vision",
+    "label",
+    "confidence",
+    "onnx",
+    "mobilenet",
+    "blob",
+    "file path",
+]
 
 _SCHEMA_DOC_LLM = (
     "Image-classification functions over image blobs and file paths. `top_label` (scalar) "
@@ -118,6 +142,66 @@ _SCHEMA_EXAMPLE_QUERIES = (
     "SELECT idx, label FROM vision.main.image_classes() WHERE idx < 5 ORDER BY idx;"
 )
 
+# A parameterless table function always returns the same rows, so it is also
+# exposed as a regular view of the same name (VGI311): `SELECT * FROM
+# vision.main.image_classes` (no parentheses) scans the `image_classes()` table
+# function. The view and the table function share the name in different DuckDB
+# namespaces (relation vs. function), so both call styles work.
+_CLASSES_VIEW_TITLE = "ImageNet Class List (view)"
+
+_CLASSES_VIEW_DOC_LLM = (
+    "The classifier's entire ImageNet-1k label set as a queryable view of `(idx, label)` rows — "
+    "all 1000 classes the model can predict — so it reads like a normal table: "
+    "`SELECT * FROM vision.main.image_classes` (no parentheses). It is a thin wrapper over the "
+    "`image_classes()` table function. Use it to discover or validate which labels "
+    "`top_label`/`classify` can return, or to join predicted labels against the canonical class "
+    "list. `idx` is the 0-based position into the model's output vector; `label` is the "
+    "human-readable class name. Always returns exactly 1000 rows."
+)
+
+_CLASSES_VIEW_DOC_MD = (
+    "## `image_classes` (view)\n\n"
+    "A view over the `image_classes()` table function listing **every ImageNet-1k class** the "
+    "model can predict (1000 rows). Query it without parentheses: "
+    "`SELECT * FROM vision.main.image_classes`.\n\n"
+    "### Columns\n\n"
+    "| column | type | description |\n"
+    "|---|---|---|\n"
+    "| `idx` | INTEGER | 0-based class index into the model output |\n"
+    "| `label` | VARCHAR | ImageNet class label |\n\n"
+    "### Notes\n\n"
+    "Useful to validate or join against predicted labels from `top_label` / `classify`."
+)
+
+_CLASSES_VIEW_KEYWORDS = [
+    "image classes",
+    "labels",
+    "ImageNet",
+    "class list",
+    "vocabulary",
+    "categories",
+    "discovery",
+    "enumerate",
+    "idx",
+    "label",
+    "1000 classes",
+    "vision",
+    "view",
+]
+
+_CLASSES_VIEW_EXAMPLES = json.dumps(
+    [
+        {
+            "description": "Count the ImageNet classes the model can predict (1000).",
+            "sql": "SELECT count(*) AS n FROM vision.main.image_classes",
+        },
+        {
+            "description": "Peek at the first five (idx, label) class rows.",
+            "sql": "SELECT idx, label FROM vision.main.image_classes WHERE idx < 5 ORDER BY idx",
+        },
+    ]
+)
+
 # Catalog-level guaranteed-runnable examples (VGI509). Self-contained BLOB literal +
 # no-arg discovery; expected_result omitted on purpose (the linter only needs them
 # to execute, and pinning exact predictions/labels would be brittle). Built with
@@ -141,7 +225,7 @@ _CATALOG_EXECUTABLE_EXAMPLES = json.dumps(
 
 _CATALOG_TAGS = {
     "vgi.title": _CATALOG_TITLE,
-    "vgi.keywords": _CATALOG_KEYWORDS,
+    "vgi.keywords": keywords_json(_CATALOG_KEYWORDS),
     "vgi.doc_llm": _CATALOG_DOC_LLM,
     "vgi.doc_md": _CATALOG_DOC_MD,
     "vgi.executable_examples": _CATALOG_EXECUTABLE_EXAMPLES,
@@ -164,10 +248,9 @@ _VISION_CATALOG = Catalog(
             comment="Image classification (ImageNet) on image blobs for SQL",
             tags={
                 "vgi.title": _SCHEMA_TITLE,
-                "vgi.keywords": _SCHEMA_KEYWORDS,
+                "vgi.keywords": keywords_json(_SCHEMA_KEYWORDS),
                 "vgi.doc_llm": _SCHEMA_DOC_LLM,
                 "vgi.doc_md": _SCHEMA_DOC_MD,
-                "vgi.source_url": ("https://github.com/Query-farm/vgi-vision/blob/main/vision_worker.py"),
                 "vgi.example_queries": _SCHEMA_EXAMPLE_QUERIES,
                 # VGI123 classifying tags use BARE keys (not vgi.-namespaced).
                 "domain": "computer-vision",
@@ -175,6 +258,29 @@ _VISION_CATALOG = Catalog(
                 "topic": "imagenet-labeling",
             },
             functions=[*SCALAR_FUNCTIONS, *TABLE_FUNCTIONS],
+            views=[
+                View(
+                    name="image_classes",
+                    definition="SELECT idx, label FROM vision.main.image_classes()",
+                    comment="The model's ImageNet label set: (idx, label), 1000 rows",
+                    column_comments={
+                        "idx": "0-based class index into the model's output vector.",
+                        "label": "Human-readable ImageNet class label.",
+                    },
+                    tags={
+                        "vgi.title": _CLASSES_VIEW_TITLE,
+                        "vgi.keywords": keywords_json(_CLASSES_VIEW_KEYWORDS),
+                        "vgi.doc_llm": _CLASSES_VIEW_DOC_LLM,
+                        "vgi.doc_md": _CLASSES_VIEW_DOC_MD,
+                        "vgi.executable_examples": _CLASSES_VIEW_EXAMPLES,
+                        "vgi.example_queries": _CLASSES_VIEW_EXAMPLES,
+                        # VGI123 classifying tags use BARE keys (not vgi.-namespaced).
+                        "domain": "computer-vision",
+                        "category": "image-classification",
+                        "topic": "imagenet-labeling",
+                    },
+                ),
+            ],
         ),
     ],
 )
