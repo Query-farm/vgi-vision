@@ -130,6 +130,7 @@ class TopLabelFunction(ScalarFunction):
                 doc_md=_TOP_LABEL_DOC_MD,
                 keywords=_TOP_LABEL_KEYWORDS,
             ),
+            "vgi.category": "Image Classification",
             "vgi.executable_examples": _TOP_LABEL_BLOB_EXAMPLES,
         }
         examples = [
@@ -164,6 +165,7 @@ class TopLabelPathFunction(ScalarFunction):
                 doc_md=_TOP_LABEL_DOC_MD,
                 keywords=_TOP_LABEL_KEYWORDS,
             ),
+            "vgi.category": "Image Classification",
             "vgi.executable_examples": _TOP_LABEL_PATH_EXAMPLES,
         }
         examples = [

@@ -13,3 +13,6 @@ duckdb_unittest_tempdir/
 # Model weights + labels are downloaded on first use and cached; never commit them.
 *.onnx
 models/
+
+# vgi-lint execution/AI caches
+.vgi-*-cache.json

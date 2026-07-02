@@ -105,7 +105,7 @@ _CATALOG_DOC_MD = (
     "inference cost.\n\n"
     "## Functions\n\n"
     "- **`top_label(image)` / `top_label(path)`** — scalar: the single #1 predicted ImageNet "
-    "label per row. Ideal for a `SELECT vision.top_label(photo) FROM media` enrichment column.\n"
+    "label per row. Ideal as a per-row enrichment column over a table of image blobs.\n"
     "- **`classify(image[, top_k])` / `classify(path[, top_k])`** — table function returning the "
     "top-k `(label, confidence)` predictions, confidence descending (default top-5).\n"
     "- **`image_classes()`** — table function listing the model's full `(idx, label)` label set "
@@ -173,9 +173,9 @@ _CLASSES_VIEW_TITLE = "ImageNet Class List (view)"
 
 _CLASSES_VIEW_DOC_LLM = (
     "The classifier's entire ImageNet-1k label set as a queryable view of `(idx, label)` rows — "
-    "all 1000 classes the model can predict — so it reads like a normal table: "
-    "`SELECT * FROM vision.main.image_classes` (no parentheses). It is a thin wrapper over the "
-    "`image_classes()` table function. Use it to discover or validate which labels "
+    "all 1000 classes the model can predict — so it reads like a normal table you query "
+    "without parentheses, unlike the parenthesized `image_classes()` table function. It is a "
+    "thin wrapper over the `image_classes()` table function. Use it to discover or validate which labels "
     "`top_label`/`classify` can return, or to join predicted labels against the canonical class "
     "list. `idx` is the 0-based position into the model's output vector; `label` is the "
     "human-readable class name. Always returns exactly 1000 rows."
@@ -184,8 +184,10 @@ _CLASSES_VIEW_DOC_LLM = (
 _CLASSES_VIEW_DOC_MD = (
     "## `image_classes` (view)\n\n"
     "A view over the `image_classes()` table function listing **every ImageNet-1k class** the "
-    "model can predict (1000 rows). Query it without parentheses: "
-    "`SELECT * FROM vision.main.image_classes`.\n\n"
+    "model can predict (1000 rows). Query it without parentheses:\n\n"
+    "```sql\n"
+    "SELECT * FROM vision.main.image_classes;\n"
+    "```\n\n"
     "### Columns\n\n"
     "| column | type | description |\n"
     "|---|---|---|\n"
@@ -245,8 +247,86 @@ _CATALOG_EXECUTABLE_EXAMPLES = json.dumps(
     ]
 )
 
+# Schema-level category registry (VGI413/410/411/412). Every object in the schema
+# is assigned to exactly one of these via its `vgi.category` tag, giving the catalog
+# a navigable two-section structure: prediction vs. label discovery.
+_SCHEMA_CATEGORIES = json.dumps(
+    [
+        {
+            "name": "Image Classification",
+            "description": (
+                "Predict ImageNet labels for an image — the single best label "
+                "(`top_label`) or the ranked top-k with confidences (`classify`)."
+            ),
+        },
+        {
+            "name": "Class Labels",
+            "description": (
+                "Discover and enumerate the model's fixed 1000-class ImageNet "
+                "label set — the vocabulary the classifier can return."
+            ),
+        },
+    ]
+)
+
+# Agent-suitability suite (VGI152/VGI920). Each task is graded deterministically:
+# the analyst is shown only the catalog overview + examples, must author SQL, and
+# its terminal result is compared to `reference_sql`. Tasks are kept deterministic
+# (the model + the committed sample image are fixed) and jointly exercise every
+# object: the two `image_classes` discovery tasks, `top_label`, and `classify`.
+_AGENT_TEST_TASKS = json.dumps(
+    [
+        {
+            "name": "count-imagenet-classes",
+            "prompt": (
+                "How many rows does the model's ImageNet class listing return — i.e. the "
+                "total number of (idx, label) entries in the full class list? Return that "
+                "single number."
+            ),
+            "reference_sql": "SELECT count(*) AS n FROM vision.main.image_classes()",
+            "ignore_column_names": True,
+        },
+        {
+            "name": "label-at-index-zero",
+            "prompt": ("What is the ImageNet class label at class index 0? Return the single label."),
+            "reference_sql": "SELECT label FROM vision.main.image_classes() WHERE idx = 0",
+            "ignore_column_names": True,
+        },
+        {
+            "name": "lowest-index-labels",
+            "prompt": (
+                "List the three ImageNet classes with the smallest class index. Return "
+                "columns `idx` and `label`, ordered by `idx` ascending."
+            ),
+            "reference_sql": ("SELECT idx, label FROM vision.main.image_classes() WHERE idx < 3 ORDER BY idx"),
+        },
+        {
+            "name": "top-label-of-sample-image",
+            "prompt": (
+                "The catalog's examples embed a small sample image as a BLOB literal (and "
+                "also reference it as the file path 'test/sql/data/sample.png'). Using that "
+                "exact sample image, return its single most likely ImageNet label in a "
+                "column named `label`."
+            ),
+            "reference_sql": (f"SELECT vision.main.top_label('{SAMPLE_IMAGE_BLOB}'::BLOB) AS label"),
+            "ignore_column_names": True,
+        },
+        {
+            "name": "top-3-labels-of-sample-image",
+            "prompt": (
+                "For that same sample image, return the three most confident predicted "
+                "ImageNet labels in a single column named `label` (the top-3 predictions)."
+            ),
+            "reference_sql": (f"SELECT label FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 3)"),
+            "unordered": True,
+            "ignore_column_names": True,
+        },
+    ]
+)
+
 _CATALOG_TAGS = {
     "vgi.title": _CATALOG_TITLE,
+    "vgi.agent_test_tasks": _AGENT_TEST_TASKS,
     "vgi.keywords": keywords_json(_CATALOG_KEYWORDS),
     "vgi.doc_llm": _CATALOG_DOC_LLM,
     "vgi.doc_md": _CATALOG_DOC_MD,
@@ -274,6 +354,7 @@ _VISION_CATALOG = Catalog(
                 "vgi.doc_llm": _SCHEMA_DOC_LLM,
                 "vgi.doc_md": _SCHEMA_DOC_MD,
                 "vgi.example_queries": _SCHEMA_EXAMPLE_QUERIES,
+                "vgi.categories": _SCHEMA_CATEGORIES,
                 # VGI123 classifying tags use BARE keys (not vgi.-namespaced).
                 "domain": "computer-vision",
                 "category": "image-classification",
@@ -296,6 +377,7 @@ _VISION_CATALOG = Catalog(
                         "vgi.doc_md": _CLASSES_VIEW_DOC_MD,
                         "vgi.executable_examples": _CLASSES_VIEW_EXAMPLES,
                         "vgi.example_queries": _CLASSES_VIEW_EXAMPLES,
+                        "vgi.category": "Class Labels",
                         # VGI123 classifying tags use BARE keys (not vgi.-namespaced).
                         "domain": "computer-vision",
                         "category": "image-classification",

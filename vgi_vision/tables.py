@@ -350,6 +350,7 @@ class ClassifyFunction(TableFunctionGenerator[_ClassifyBlobArgs, ScanState]):
                 doc_md=_CLASSIFY_DOC_MD,
                 keywords=_CLASSIFY_KEYWORDS,
             ),
+            "vgi.category": "Image Classification",
             "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
             "vgi.executable_examples": _CLASSIFY_BLOB_EXAMPLES,
         }
@@ -398,6 +399,7 @@ class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs, ScanSta
                 doc_md=_CLASSIFY_DOC_MD,
                 keywords=_CLASSIFY_KEYWORDS,
             ),
+            "vgi.category": "Image Classification",
             "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
             "vgi.executable_examples": _CLASSIFY_BLOB_TOPK_EXAMPLES,
         }
@@ -463,6 +465,7 @@ class ClassifyPathFunction(TableFunctionGenerator[_ClassifyPathArgs, ScanState])
                 doc_md=_CLASSIFY_DOC_MD,
                 keywords=_CLASSIFY_KEYWORDS,
             ),
+            "vgi.category": "Image Classification",
             "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
             "vgi.executable_examples": _CLASSIFY_PATH_EXAMPLES,
         }
@@ -511,6 +514,7 @@ class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs, Sca
                 doc_md=_CLASSIFY_DOC_MD,
                 keywords=_CLASSIFY_KEYWORDS,
             ),
+            "vgi.category": "Image Classification",
             "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
             "vgi.executable_examples": _CLASSIFY_PATH_TOPK_EXAMPLES,
         }
@@ -570,6 +574,7 @@ class ImageClassesFunction(TableFunctionGenerator[_NoArgs, ScanState]):
                 doc_md=_CLASSES_DOC_MD,
                 keywords=_CLASSES_KEYWORDS,
             ),
+            "vgi.category": "Class Labels",
             "vgi.result_columns_md": _CLASSES_COLUMNS_MD,
             "vgi.executable_examples": _CLASSES_EXAMPLES,
         }
