@@ -24,7 +24,6 @@ from typing import Annotated
 
 import pyarrow as pa
 from vgi.arguments import Param, Returns
-from vgi.metadata import FunctionExample
 from vgi.scalar_function import ScalarFunction
 
 from . import model
@@ -45,8 +44,8 @@ _TOP_LABEL_DOC_LLM = (
     "`SELECT` projection or a `WHERE`/`GROUP BY` predicate. Use it to tag a column of "
     "images, filter rows to a subject (`WHERE top_label(img) = 'tabby'`), or bucket "
     "images by what they depict.\n\n"
-    "Two arity-1 overloads share the name and resolve by input type: a **BLOB** overload "
-    "(`top_label(image)`) over raw image bytes, and a **VARCHAR** overload "
+    "Two arity-1 overloads share the name and resolve by input type: a `BLOB` overload "
+    "(`top_label(image)`) over raw image bytes, and a `VARCHAR` overload "
     "(`top_label(path)`) that reads the image off a filesystem path. Inputs are untrusted: "
     "a NULL, malformed, empty, over-large, or unreadable image yields SQL `NULL` rather "
     "than raising. For the top-k predictions with confidences, use `classify` instead."
@@ -80,25 +79,22 @@ _TOP_LABEL_KEYWORDS = [
     "label image",
 ]
 
-# Built with ``json.dumps`` so the BLOB literal's backslash-x escapes are correctly
-# JSON-escaped (raw ``\x`` is invalid JSON; VGI507).
-_TOP_LABEL_BLOB_EXAMPLES = json.dumps(
-    [
-        {
-            "description": "Top label for an image BLOB literal (a tiny committed PNG).",
-            "sql": f"SELECT vision.main.top_label('{SAMPLE_IMAGE_BLOB}'::BLOB) AS label",
-        }
-    ]
-)
-
-_TOP_LABEL_PATH_EXAMPLES = json.dumps(
-    [
-        {
-            "description": "Top label for an image read from a filesystem path.",
-            "sql": f"SELECT vision.main.top_label('{_SAMPLE_IMAGE_PATH}') AS label",
-        }
-    ]
-)
+# Described, guaranteed-runnable examples (VGI503/509/515). Both overloads of the
+# shared function name carry the SAME aggregated example set (VGI515's "aggregate by
+# function name" rule) so whichever overload row DuckDB surfaces the tags on, every
+# example is present and described. Built with ``json.dumps`` so the BLOB literal's
+# backslash-x escapes are correctly JSON-escaped (raw ``\x`` is invalid JSON; VGI507).
+_TOP_LABEL_EXAMPLES_DATA = [
+    {
+        "description": "Predict the single most likely ImageNet label for an image BLOB literal.",
+        "sql": f"SELECT vision.main.top_label('{SAMPLE_IMAGE_BLOB}'::BLOB) AS label",
+    },
+    {
+        "description": "Predict the top label for an image read from a filesystem path.",
+        "sql": f"SELECT vision.main.top_label('{_SAMPLE_IMAGE_PATH}') AS label",
+    },
+]
+_TOP_LABEL_EXAMPLES = json.dumps(_TOP_LABEL_EXAMPLES_DATA)
 
 
 def _read_path(path: str | None) -> bytes | None:
@@ -131,14 +127,9 @@ class TopLabelFunction(ScalarFunction):
                 keywords=_TOP_LABEL_KEYWORDS,
             ),
             "vgi.category": "Image Classification",
-            "vgi.executable_examples": _TOP_LABEL_BLOB_EXAMPLES,
+            "vgi.example_queries": _TOP_LABEL_EXAMPLES,
+            "vgi.executable_examples": _TOP_LABEL_EXAMPLES,
         }
-        examples = [
-            FunctionExample(
-                sql=f"SELECT vision.main.top_label('{SAMPLE_IMAGE_BLOB}'::BLOB) AS label",
-                description="Top predicted label for an image BLOB literal",
-            ),
-        ]
 
     @classmethod
     def compute(
@@ -166,14 +157,9 @@ class TopLabelPathFunction(ScalarFunction):
                 keywords=_TOP_LABEL_KEYWORDS,
             ),
             "vgi.category": "Image Classification",
-            "vgi.executable_examples": _TOP_LABEL_PATH_EXAMPLES,
+            "vgi.example_queries": _TOP_LABEL_EXAMPLES,
+            "vgi.executable_examples": _TOP_LABEL_EXAMPLES,
         }
-        examples = [
-            FunctionExample(
-                sql=f"SELECT vision.main.top_label('{_SAMPLE_IMAGE_PATH}') AS label",
-                description="Top predicted label for an image on disk",
-            ),
-        ]
 
     @classmethod
     def compute(

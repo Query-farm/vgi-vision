@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "vgi-python[http]>=0.8.5",
+#     "vgi-python[http]>=0.16.0",
 #     "onnxruntime>=1.17",
 #     "pillow>=10",
 #     "numpy>=1.26",
@@ -37,13 +37,13 @@ import json
 from typing import Any
 
 from vgi import Worker
-from vgi.catalog import Catalog, Schema, View
+from vgi.catalog import Catalog, Schema, Table
 
 from vgi_vision import model
 from vgi_vision._examples import SAMPLE_IMAGE_BLOB
 from vgi_vision.meta import keywords_json
 from vgi_vision.scalars import SCALAR_FUNCTIONS
-from vgi_vision.tables import TABLE_FUNCTIONS
+from vgi_vision.tables import TABLE_FUNCTIONS, ImageClassesFunction
 
 _CATALOG_TITLE = "Image Classification (ImageNet)"
 
@@ -150,44 +150,69 @@ _SCHEMA_DOC_MD = (
     "| `top_label(image\\|path)` | scalar | the #1 predicted label |\n"
     "| `classify(image\\|path[, top_k])` | table | top-k `(label, confidence)` |\n"
     "| `image_classes()` | table | the full `(idx, label)` label set |\n\n"
-    "Images may be BLOB columns or filesystem paths; bad images yield NULL / no rows."
+    "Images may be `BLOB` columns or filesystem paths; bad images yield NULL / no rows."
 )
 
-# Representative catalog-qualified SQL for the schema (VGI506). The classify
-# example uses a BLOB literal so it is self-contained (no `photos` table, no
-# subquery argument, which DuckDB rejects for table functions).
-_SCHEMA_EXAMPLE_QUERIES = (
-    f"SELECT vision.main.top_label('{SAMPLE_IMAGE_BLOB}'::BLOB) AS label;\n"
-    f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB);\n"
-    f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 10);\n"
-    "SELECT count(*) AS n_classes FROM vision.main.image_classes();\n"
-    "SELECT idx, label FROM vision.main.image_classes() WHERE idx < 5 ORDER BY idx;"
+# Representative catalog-qualified SQL for the schema (VGI506), as a described-example
+# JSON list (VGI515 requires every schema/function example to carry a description). The
+# classify examples use a BLOB literal so they are self-contained (no `photos` table, no
+# subquery argument, which DuckDB rejects for table functions) and project + order rather
+# than dumping `SELECT *`.
+_SCHEMA_EXAMPLE_QUERIES = json.dumps(
+    [
+        {
+            "description": "Single most likely ImageNet label for an image BLOB literal.",
+            "sql": f"SELECT vision.main.top_label('{SAMPLE_IMAGE_BLOB}'::BLOB) AS label",
+        },
+        {
+            "description": "Top-5 (label, confidence) predictions for an image BLOB literal, confidence-descending.",
+            "sql": (
+                f"SELECT label, round(confidence, 4) AS confidence "
+                f"FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB) ORDER BY confidence DESC"
+            ),
+        },
+        {
+            "description": "Top-10 predictions for an image BLOB literal (explicit top_k).",
+            "sql": (
+                f"SELECT label, round(confidence, 4) AS confidence "
+                f"FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 10) ORDER BY confidence DESC"
+            ),
+        },
+        {
+            "description": "Count the ImageNet classes the model can predict (1000).",
+            "sql": "SELECT count(*) AS n_classes FROM vision.main.image_classes()",
+        },
+        {
+            "description": "Peek at the first five (idx, label) class rows.",
+            "sql": "SELECT idx, label FROM vision.main.image_classes() WHERE idx < 5 ORDER BY idx",
+        },
+    ]
 )
 
-# A parameterless table function always returns the same rows, so it is also
-# exposed as a regular view of the same name (VGI311): `SELECT * FROM
+# A parameterless table function always returns the same rows, so the same data is
+# also exposed as a regular scan-backed table of the same name: `SELECT * FROM
 # vision.main.image_classes` (no parentheses) scans the `image_classes()` table
-# function. The view and the table function share the name in different DuckDB
-# namespaces (relation vs. function), so both call styles work.
-_CLASSES_VIEW_TITLE = "ImageNet Class List (view)"
+# function. The table and the table function share the name in different DuckDB
+# namespaces (relation vs. function), so both call styles work. (A plain view over a
+# parameterless table function would be pure indirection — VGI145 — so this is a
+# function-backed table instead.)
+_CLASSES_VIEW_TITLE = "ImageNet Class List (table)"
 
 _CLASSES_VIEW_DOC_LLM = (
-    "The classifier's entire ImageNet-1k label set as a queryable view of `(idx, label)` rows — "
+    "The classifier's entire ImageNet-1k label set as a queryable table of `(idx, label)` rows — "
     "all 1000 classes the model can predict — so it reads like a normal table you query "
-    "without parentheses, unlike the parenthesized `image_classes()` table function. It is a "
-    "thin wrapper over the `image_classes()` table function. Use it to discover or validate which labels "
+    "without parentheses, unlike the parenthesized `image_classes()` table function it scans. "
+    "Use it to discover or validate which labels "
     "`top_label`/`classify` can return, or to join predicted labels against the canonical class "
     "list. `idx` is the 0-based position into the model's output vector; `label` is the "
     "human-readable class name. Always returns exactly 1000 rows."
 )
 
 _CLASSES_VIEW_DOC_MD = (
-    "## `image_classes` (view)\n\n"
-    "A view over the `image_classes()` table function listing **every ImageNet-1k class** the "
-    "model can predict (1000 rows). Query it without parentheses:\n\n"
-    "```sql\n"
-    "SELECT * FROM vision.main.image_classes;\n"
-    "```\n\n"
+    "## `image_classes` (table)\n\n"
+    "A scan-backed table listing **every ImageNet-1k class** the model can predict (1000 rows), "
+    "queried without parentheses (`vision.main.image_classes`) — the same data the "
+    "`image_classes()` table function returns.\n\n"
     "### Columns\n\n"
     "| column | type | description |\n"
     "|---|---|---|\n"
@@ -210,7 +235,7 @@ _CLASSES_VIEW_KEYWORDS = [
     "label",
     "1000 classes",
     "vision",
-    "view",
+    "table",
 ]
 
 _CLASSES_VIEW_EXAMPLES = json.dumps(
@@ -237,8 +262,11 @@ _CATALOG_EXECUTABLE_EXAMPLES = json.dumps(
             "sql": f"SELECT vision.main.top_label('{SAMPLE_IMAGE_BLOB}'::BLOB) AS label",
         },
         {
-            "description": "Top-5 (label, confidence) predictions for an image BLOB.",
-            "sql": f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB)",
+            "description": "Top-5 (label, confidence) predictions for an image BLOB, confidence-descending.",
+            "sql": (
+                f"SELECT label, round(confidence, 4) AS confidence "
+                f"FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB) ORDER BY confidence DESC"
+            ),
         },
         {
             "description": "Count the classes the model can predict (1000 ImageNet labels).",
@@ -361,11 +389,18 @@ _VISION_CATALOG = Catalog(
                 "topic": "imagenet-labeling",
             },
             functions=[*SCALAR_FUNCTIONS, *TABLE_FUNCTIONS],
-            views=[
-                View(
+            tables=[
+                Table(
                     name="image_classes",
-                    definition="SELECT idx, label FROM vision.main.image_classes()",
+                    function=ImageClassesFunction,
                     comment="The model's ImageNet label set: (idx, label), 1000 rows",
+                    cardinality_estimate=model.NUM_CLASSES,
+                    cardinality_max=model.NUM_CLASSES,
+                    # The class index is the row identity (0..999); the label text is
+                    # likewise distinct across the fixed 1000-class label set.
+                    primary_key=(("idx",),),
+                    not_null=("idx", "label"),
+                    unique=(("label",),),
                     column_comments={
                         "idx": "0-based class index into the model's output vector.",
                         "label": "Human-readable ImageNet class label.",

@@ -28,7 +28,6 @@ from typing import Annotated, ClassVar
 
 import pyarrow as pa
 from vgi import Arg
-from vgi.metadata import FunctionExample
 from vgi.table_function import (
     BindParams,
     ProcessParams,
@@ -134,21 +133,27 @@ _CLASSES_SCHEMA = pa.schema(
     ]
 )
 
-# Markdown column docs for the dynamic table-function schemas. DuckDB can't expose a
-# table function's returned columns statically, so each function advertises them via a
-# `vgi.result_columns_md` tag (consumed by describe/listing tooling and the metadata linter).
-_CLASSIFY_COLUMNS_MD = (
-    "| column | type | description |\n"
-    "|---|---|---|\n"
-    "| `label` | VARCHAR | Predicted ImageNet class label. |\n"
-    "| `confidence` | DOUBLE | Softmax probability in [0, 1]; rows are confidence descending. |"
+# Static result schema for the table functions (VGI307). DuckDB can't expose a table
+# function's returned columns through the catalog, so each function advertises its fixed
+# result shape via the `vgi.result_columns_schema` tag (a JSON array of {name, type,
+# description}), consumed by describe/listing tooling and the metadata linter. (Supersedes
+# the retired `vgi.result_columns_md` Markdown tag.)
+_CLASSIFY_RESULT_SCHEMA = json.dumps(
+    [
+        {"name": "label", "type": "VARCHAR", "description": "Predicted ImageNet class label."},
+        {
+            "name": "confidence",
+            "type": "DOUBLE",
+            "description": "Softmax probability in [0, 1]; rows are ordered confidence-descending.",
+        },
+    ]
 )
 
-_CLASSES_COLUMNS_MD = (
-    "| column | type | description |\n"
-    "|---|---|---|\n"
-    "| `idx` | INTEGER | 0-based class index into the model's output. |\n"
-    "| `label` | VARCHAR | ImageNet class label. |"
+_CLASSES_RESULT_SCHEMA = json.dumps(
+    [
+        {"name": "idx", "type": "INTEGER", "description": "0-based class index into the model's output."},
+        {"name": "label", "type": "VARCHAR", "description": "ImageNet class label."},
+    ]
 )
 
 
@@ -160,9 +165,9 @@ _CLASSIFY_DOC_LLM = (
     "alternatives.\n\n"
     "It is a *source* table function: pass the image **positionally**. Overloads resolve "
     "by argument type and arity — `classify(image)` / `classify(image, top_k)` over a "
-    "**BLOB**, and `classify(path)` / `classify(path, top_k)` over a **VARCHAR** filesystem "
+    "`BLOB`, and `classify(path)` / `classify(path, top_k)` over a `VARCHAR` filesystem "
     "path; `top_k` defaults to 5. A table-function argument cannot be a `(SELECT ...)` "
-    "subquery (DuckDB rejects it), so pass a BLOB column/literal or a path string directly. "
+    "subquery (DuckDB rejects it), so pass a `BLOB` column/literal or a path string directly. "
     "A NULL/malformed/over-large/unreadable image emits **no rows** rather than crashing. "
     "Returns columns `label VARCHAR` and `confidence DOUBLE` (softmax probability in [0, 1])."
 )
@@ -182,7 +187,7 @@ _CLASSIFY_DOC_MD = (
     "| `confidence` | DOUBLE | softmax probability in [0, 1] |\n\n"
     "### Notes\n\n"
     "A NULL/malformed image yields **no rows**. A table-function argument cannot be a "
-    "`(SELECT ...)` subquery — pass a BLOB column/literal or a path string."
+    "`(SELECT ...)` subquery — pass a `BLOB` column/literal or a path string."
 )
 
 _CLASSIFY_KEYWORDS = [
@@ -237,54 +242,57 @@ _CLASSES_KEYWORDS = [
     "vision",
 ]
 
-# Per-function guaranteed-runnable examples (VGI509). Self-contained: BLOB literals
-# for the BLOB overloads, the committed fixture path for the path overloads, and the
-# no-arg discovery function. expected_result omitted (execution-only check). Built with
-# ``json.dumps`` so the BLOB literal's backslash-x escapes are valid JSON (VGI507).
-_CLASSIFY_BLOB_EXAMPLES = json.dumps(
-    [
-        {
-            "description": "Top-5 (label, confidence) predictions for an image BLOB literal.",
-            "sql": f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB)",
-        }
-    ]
-)
-_CLASSIFY_BLOB_TOPK_EXAMPLES = json.dumps(
-    [
-        {
-            "description": "Top-3 (label, confidence) predictions for an image BLOB literal.",
-            "sql": f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 3)",
-        }
-    ]
-)
-_CLASSIFY_PATH_EXAMPLES = json.dumps(
-    [
-        {
-            "description": "Top-5 predictions for an image read from a filesystem path.",
-            "sql": f"SELECT * FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}')",
-        }
-    ]
-)
-_CLASSIFY_PATH_TOPK_EXAMPLES = json.dumps(
-    [
-        {
-            "description": "Top-3 predictions for an image read from a filesystem path.",
-            "sql": f"SELECT * FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}', 3)",
-        }
-    ]
-)
-_CLASSES_EXAMPLES = json.dumps(
-    [
-        {
-            "description": "Count the ImageNet classes the model can predict (1000).",
-            "sql": "SELECT count(*) AS n FROM vision.main.image_classes()",
-        },
-        {
-            "description": "Peek at the first five (idx, label) class rows.",
-            "sql": "SELECT idx, label FROM vision.main.image_classes() WHERE idx < 5 ORDER BY idx",
-        },
-    ]
-)
+# Described, guaranteed-runnable examples (VGI503/509/514/515). Every classify overload
+# shares the name ``classify``; per VGI515's "aggregate by function name" rule each overload
+# carries the SAME aggregated example set, so whichever overload row DuckDB surfaces the tags
+# on, every example is present and described. Examples project the columns that matter and
+# ORDER BY confidence (not a bare ``SELECT *``; VGI514) so their output is deterministic
+# (VGI510). Self-contained: BLOB literals for the BLOB overloads, the committed fixture path
+# for the path overloads. Built with ``json.dumps`` so the BLOB literal's backslash-x escapes
+# are valid JSON (VGI507).
+_CLASSIFY_EXAMPLES_DATA = [
+    {
+        "description": "Top-5 predictions for an image BLOB literal, with rounded confidence, most-confident first.",
+        "sql": (
+            f"SELECT label, round(confidence, 4) AS confidence "
+            f"FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB) ORDER BY confidence DESC"
+        ),
+    },
+    {
+        "description": "Top-10 predictions for an image BLOB literal (explicit top_k), confidence-descending.",
+        "sql": (
+            f"SELECT label, round(confidence, 4) AS confidence "
+            f"FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 10) ORDER BY confidence DESC"
+        ),
+    },
+    {
+        "description": "Top-5 predictions for an image read from a filesystem path, confidence-descending.",
+        "sql": (
+            f"SELECT label, round(confidence, 4) AS confidence "
+            f"FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}') ORDER BY confidence DESC"
+        ),
+    },
+    {
+        "description": "Top-3 predictions for an image on a filesystem path (explicit top_k), confidence-descending.",
+        "sql": (
+            f"SELECT label, round(confidence, 4) AS confidence "
+            f"FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}', 3) ORDER BY confidence DESC"
+        ),
+    },
+]
+_CLASSIFY_EXAMPLES = json.dumps(_CLASSIFY_EXAMPLES_DATA)
+
+_CLASSES_EXAMPLES_DATA = [
+    {
+        "description": "Count the ImageNet classes the model can predict (1000).",
+        "sql": "SELECT count(*) AS n FROM vision.main.image_classes()",
+    },
+    {
+        "description": "Peek at the first five (idx, label) class rows.",
+        "sql": "SELECT idx, label FROM vision.main.image_classes() WHERE idx < 5 ORDER BY idx",
+    },
+]
+_CLASSES_EXAMPLES = json.dumps(_CLASSES_EXAMPLES_DATA)
 
 
 def _classify_batch(preds: list[tuple[str, float]] | None, schema: pa.Schema) -> pa.RecordBatch:
@@ -351,15 +359,10 @@ class ClassifyFunction(TableFunctionGenerator[_ClassifyBlobArgs, ScanState]):
                 keywords=_CLASSIFY_KEYWORDS,
             ),
             "vgi.category": "Image Classification",
-            "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
-            "vgi.executable_examples": _CLASSIFY_BLOB_EXAMPLES,
+            "vgi.result_columns_schema": _CLASSIFY_RESULT_SCHEMA,
+            "vgi.example_queries": _CLASSIFY_EXAMPLES,
+            "vgi.executable_examples": _CLASSIFY_EXAMPLES,
         }
-        examples = [
-            FunctionExample(
-                sql=f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB)",
-                description="Top-5 predictions for an image BLOB literal",
-            ),
-        ]
 
     @classmethod
     def cardinality(cls, params: BindParams[_ClassifyBlobArgs]) -> TableCardinality:
@@ -400,15 +403,10 @@ class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs, ScanSta
                 keywords=_CLASSIFY_KEYWORDS,
             ),
             "vgi.category": "Image Classification",
-            "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
-            "vgi.executable_examples": _CLASSIFY_BLOB_TOPK_EXAMPLES,
+            "vgi.result_columns_schema": _CLASSIFY_RESULT_SCHEMA,
+            "vgi.example_queries": _CLASSIFY_EXAMPLES,
+            "vgi.executable_examples": _CLASSIFY_EXAMPLES,
         }
-        examples = [
-            FunctionExample(
-                sql=f"SELECT * FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 10)",
-                description="Top-10 predictions for an image BLOB literal",
-            ),
-        ]
 
     @classmethod
     def cardinality(cls, params: BindParams[_ClassifyBlobTopKArgs]) -> TableCardinality:
@@ -466,15 +464,10 @@ class ClassifyPathFunction(TableFunctionGenerator[_ClassifyPathArgs, ScanState])
                 keywords=_CLASSIFY_KEYWORDS,
             ),
             "vgi.category": "Image Classification",
-            "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
-            "vgi.executable_examples": _CLASSIFY_PATH_EXAMPLES,
+            "vgi.result_columns_schema": _CLASSIFY_RESULT_SCHEMA,
+            "vgi.example_queries": _CLASSIFY_EXAMPLES,
+            "vgi.executable_examples": _CLASSIFY_EXAMPLES,
         }
-        examples = [
-            FunctionExample(
-                sql=f"SELECT * FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}')",
-                description="Top-5 predictions for an image on disk",
-            ),
-        ]
 
     @classmethod
     def cardinality(cls, params: BindParams[_ClassifyPathArgs]) -> TableCardinality:
@@ -515,15 +508,10 @@ class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs, Sca
                 keywords=_CLASSIFY_KEYWORDS,
             ),
             "vgi.category": "Image Classification",
-            "vgi.result_columns_md": _CLASSIFY_COLUMNS_MD,
-            "vgi.executable_examples": _CLASSIFY_PATH_TOPK_EXAMPLES,
+            "vgi.result_columns_schema": _CLASSIFY_RESULT_SCHEMA,
+            "vgi.example_queries": _CLASSIFY_EXAMPLES,
+            "vgi.executable_examples": _CLASSIFY_EXAMPLES,
         }
-        examples = [
-            FunctionExample(
-                sql=f"SELECT * FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}', 10)",
-                description="Top-10 predictions for an image on disk",
-            ),
-        ]
 
     @classmethod
     def cardinality(cls, params: BindParams[_ClassifyPathTopKArgs]) -> TableCardinality:
@@ -575,15 +563,10 @@ class ImageClassesFunction(TableFunctionGenerator[_NoArgs, ScanState]):
                 keywords=_CLASSES_KEYWORDS,
             ),
             "vgi.category": "Class Labels",
-            "vgi.result_columns_md": _CLASSES_COLUMNS_MD,
+            "vgi.result_columns_schema": _CLASSES_RESULT_SCHEMA,
+            "vgi.example_queries": _CLASSES_EXAMPLES,
             "vgi.executable_examples": _CLASSES_EXAMPLES,
         }
-        examples = [
-            FunctionExample(
-                sql="SELECT count(*) AS n FROM vision.main.image_classes()",
-                description="How many classes the model predicts (1000)",
-            ),
-        ]
 
     @classmethod
     def cardinality(cls, params: BindParams[_NoArgs]) -> TableCardinality:
