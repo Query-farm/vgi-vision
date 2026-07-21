@@ -9,5 +9,8 @@ The package splits into:
 * :mod:`vgi_vision.tables` -- set-returning table functions (``classify``,
   ``image_classes``).
 
-The worker entry point lives in ``vision_worker.py`` at the repo root.
+The worker itself -- the ``vision`` catalog, :class:`~vgi_vision.worker.VisionWorker`,
+and ``main()`` -- lives in :mod:`vgi_vision.worker` (wheel-importable, and the
+``vgi-vision-worker`` console script); ``vision_worker.py`` at the repo root is a thin
+PEP 723 shim re-exporting it.
 """
