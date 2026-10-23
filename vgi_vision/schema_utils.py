@@ -7,6 +7,7 @@ consistent, documented schemas to DuckDB.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import pyarrow as pa
 
@@ -17,7 +18,7 @@ def field(
     comment: str,
     *,
     nullable: bool = True,
-) -> pa.Field:
+) -> pa.Field[Any]:
     """Build a ``pa.Field`` carrying a column comment in its metadata.
 
     The ``comment`` metadata key is the framework's transport for column

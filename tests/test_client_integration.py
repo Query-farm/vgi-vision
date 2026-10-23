@@ -34,6 +34,7 @@ def test_classify_table_end_to_end() -> None:
         batches = list(
             client.table_function(
                 function_name="classify",
+                schema_path=["main"],
                 arguments=Arguments(positional=[pa.scalar(img, type=pa.binary())]),
             )
         )
@@ -54,6 +55,7 @@ def test_top_label_scalar_end_to_end() -> None:
         results = list(
             client.scalar_function(
                 function_name="top_label",
+                schema_path=["main"],
                 input=iter([batch]),
                 arguments=Arguments(positional=[]),
             )
@@ -66,6 +68,6 @@ def test_top_label_scalar_end_to_end() -> None:
 @needs_model
 def test_image_classes_end_to_end() -> None:
     with _client() as client:
-        batches = list(client.table_function(function_name="image_classes"))
+        batches = list(client.table_function(function_name="image_classes", schema_path=["main"]))
     table = pa.Table.from_batches(batches)
     assert table.num_rows == 1000

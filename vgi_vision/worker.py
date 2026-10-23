@@ -153,7 +153,9 @@ _SCHEMA_DOC_MD = (
 # JSON list (VGI515 requires every schema/function example to carry a description). The
 # classify examples use a BLOB literal so they are self-contained (no `photos` table, no
 # subquery argument, which DuckDB rejects for table functions) and project + order rather
-# than dumping `SELECT *`.
+# than dumping `SELECT *`. Each BLOB literal is ~1.6k chars, so the list keeps only two of
+# them to stay under the 4,000-char agent-context bound per tag (VGI417); the explicit
+# `top_k` overload is shown in the classify function's own examples.
 _SCHEMA_EXAMPLE_QUERIES = json.dumps(
     [
         {
@@ -165,13 +167,6 @@ _SCHEMA_EXAMPLE_QUERIES = json.dumps(
             "sql": (
                 f"SELECT label, round(confidence, 4) AS confidence "
                 f"FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB) ORDER BY confidence DESC"
-            ),
-        },
-        {
-            "description": "Top-10 predictions for an image BLOB literal (explicit top_k).",
-            "sql": (
-                f"SELECT label, round(confidence, 4) AS confidence "
-                f"FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 10) ORDER BY confidence DESC"
             ),
         },
         {
@@ -295,7 +290,9 @@ _SCHEMA_CATEGORIES = json.dumps(
 
 # Agent-suitability suite (VGI152/VGI920). Each task is graded deterministically:
 # the analyst is shown only the catalog overview + examples, must author SQL, and
-# its terminal result is compared to `reference_sql`. Tasks are kept deterministic
+# its terminal result is compared to the grader-only `reference_sql`. VGI416: the
+# grader fields live in the private `vgi-agent-tests.yaml` sidecar at the repo
+# root; this public tag carries only {name, prompt}. Tasks are kept deterministic
 # (the model + the committed sample image are fixed) and jointly exercise every
 # object: the two `image_classes` discovery tasks, `top_label`, and `classify`.
 _AGENT_TEST_TASKS = json.dumps(
@@ -307,14 +304,10 @@ _AGENT_TEST_TASKS = json.dumps(
                 "total number of (idx, label) entries in the full class list? Return that "
                 "single number."
             ),
-            "reference_sql": "SELECT count(*) AS n FROM vision.main.image_classes()",
-            "ignore_column_names": True,
         },
         {
             "name": "label-at-index-zero",
             "prompt": ("What is the ImageNet class label at class index 0? Return the single label."),
-            "reference_sql": "SELECT label FROM vision.main.image_classes() WHERE idx = 0",
-            "ignore_column_names": True,
         },
         {
             "name": "lowest-index-labels",
@@ -322,7 +315,6 @@ _AGENT_TEST_TASKS = json.dumps(
                 "List the three ImageNet classes with the smallest class index. Return "
                 "columns `idx` and `label`, ordered by `idx` ascending."
             ),
-            "reference_sql": ("SELECT idx, label FROM vision.main.image_classes() WHERE idx < 3 ORDER BY idx"),
         },
         {
             "name": "top-label-of-sample-image",
@@ -332,8 +324,6 @@ _AGENT_TEST_TASKS = json.dumps(
                 "exact sample image, return its single most likely ImageNet label in a "
                 "column named `label`."
             ),
-            "reference_sql": (f"SELECT vision.main.top_label('{SAMPLE_IMAGE_BLOB}'::BLOB) AS label"),
-            "ignore_column_names": True,
         },
         {
             "name": "top-3-labels-of-sample-image",
@@ -341,9 +331,6 @@ _AGENT_TEST_TASKS = json.dumps(
                 "For that same sample image, return the three most confident predicted "
                 "ImageNet labels in a single column named `label` (the top-3 predictions)."
             ),
-            "reference_sql": (f"SELECT label FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 3)"),
-            "unordered": True,
-            "ignore_column_names": True,
         },
     ]
 )
@@ -370,7 +357,7 @@ _VISION_CATALOG = Catalog(
     tags=_CATALOG_TAGS,
     schemas=[
         Schema(
-            name="main",
+            path=["main"],
             comment="Image classification (ImageNet) on image blobs for SQL",
             tags={
                 "vgi.title": _SCHEMA_TITLE,
