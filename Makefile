@@ -9,7 +9,7 @@
 # test-sql is self-contained: it points VGI_VISION_WORKER at the worker run as a
 # uv stdio subprocess (exactly how DuckDB drives it after ATTACH) and runs the
 # files under test/sql/. haybarn-unittest is a uv tool:
-#   uv tool install 'haybarn-unittest<2'   # installs ~/.local/bin/haybarn-unittest
+#   uv tool install --prerelease allow 'haybarn-unittest>=2.0.0rc11,<2.1'   # installs ~/.local/bin/haybarn-unittest
 
 # Worker command DuckDB uses for ATTACH (overridable). Uses the project venv python
 # (populated by `uv sync`) rather than `uv run <script>`, whose PEP-723 script env is a
@@ -36,7 +36,7 @@ test-unit:
 test-sql:
 	PATH="$(HAYBARN_BIN):$$PATH" \
 		VGI_VISION_WORKER="$(WORKER_STDIO)" \
-		haybarn-unittest --test-dir "$(TEST_DIR)" "$(TEST_PATTERN)"
+		haybarn-unittest --keep-home --test-dir "$(TEST_DIR)" "$(TEST_PATTERN)"
 
 lint:
 	uv run ruff format --check .

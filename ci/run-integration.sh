@@ -194,7 +194,9 @@ cat > "$STAGE/test/_warm.test" <<'WARM'
 statement ok
 INSTALL vgi FROM community;
 WARM
-"$HAYBARN_UNITTEST" "test/_warm.test" >/dev/null 2>&1 || echo "::warning::extension warm step did not fully succeed"
+# haybarn-unittest 2.0 isolates $HOME per run; --keep-home keeps the real home so
+# the warmed extension cache (~/.haybarn) is shared by the suite run below.
+"$HAYBARN_UNITTEST" --keep-home "test/_warm.test" >/dev/null 2>&1 || echo "::warning::extension warm step did not fully succeed"
 rm -f "$STAGE/test/_warm.test"
 
 # Run the whole suite in one invocation, streaming the runner's native
@@ -207,7 +209,7 @@ rm -f "$STAGE/test/_warm.test"
 echo "Running suite (transport: $TRANSPORT, worker: $VGI_VISION_WORKER) ..."
 REPORT_FILE="$(mktemp "${TMPDIR:-/tmp}/vision-report.XXXXXX")"
 set +e
-"$HAYBARN_UNITTEST" "test/sql/*" 2>&1 | tee "$REPORT_FILE"
+"$HAYBARN_UNITTEST" --keep-home "test/sql/*" 2>&1 | tee "$REPORT_FILE"
 RUN_RC="${PIPESTATUS[0]}"
 set -e
 if [[ "$RUN_RC" -ne 0 ]]; then

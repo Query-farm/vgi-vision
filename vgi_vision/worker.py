@@ -33,13 +33,34 @@ import json
 from typing import Any
 
 from vgi import Worker
-from vgi.catalog import Catalog, Schema, Table
+from vgi.catalog import Catalog, ConstraintInfo, Schema, Table, constraint_record
 
 from vgi_vision import model
 from vgi_vision._examples import SAMPLE_IMAGE_BLOB
 from vgi_vision.meta import keywords_json
 from vgi_vision.scalars import SCALAR_FUNCTIONS
 from vgi_vision.tables import TABLE_FUNCTIONS, ImageClassesFunction
+
+
+def _trusted(table: str, constraint_id: str, kind: str, columns: list[list[str]]) -> ConstraintInfo:
+    """Build an ENFORCED / ALL_ROWS constraint record on a ``main`` table.
+
+    DuckDB only reads trusted (ENFORCED + ALL_ROWS) records under vgi.v3, so
+    declare one only when every row the table can return satisfies it.
+
+    Args:
+        table: Table name.
+        constraint_id: Constraint id, unique within the table.
+        kind: ``PRIMARY_KEY``, ``UNIQUE`` or ``NOT_NULL``.
+        columns: Column paths, e.g. ``[["id"]]``.
+
+    Returns:
+        The canonical constraint record.
+    """
+    return constraint_record(
+        ["main"], table, constraint_id, kind, columns, enforcement="ENFORCED", validation="ALL_ROWS"
+    )
+
 
 _CATALOG_TITLE = "Image Classification (ImageNet)"
 
@@ -381,9 +402,11 @@ _VISION_CATALOG = Catalog(
                     cardinality_max=model.NUM_CLASSES,
                     # The class index is the row identity (0..999); the label text is
                     # likewise distinct across the fixed 1000-class label set.
-                    primary_key=(("idx",),),
-                    not_null=("idx", "label"),
-                    unique=(("label",),),
+                    constraints=(
+                        _trusted("image_classes", "pk", "PRIMARY_KEY", [["idx"]]),
+                        _trusted("image_classes", "label_not_null", "NOT_NULL", [["label"]]),
+                        _trusted("image_classes", "label_unique", "UNIQUE", [["label"]]),
+                    ),
                     column_comments={
                         "idx": "0-based class index into the model's output vector.",
                         "label": "Human-readable ImageNet class label.",

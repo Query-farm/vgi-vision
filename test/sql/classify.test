@@ -8,7 +8,7 @@ statement ok
 LOAD vgi;
 
 statement ok
-ATTACH 'vision' AS vision (TYPE vgi, LOCATION '${VGI_VISION_WORKER}');
+ATTACH 'vision' AS vision (TYPE vgi, LOCATION '{VGI_VISION_WORKER}');
 
 # ---- image_classes(): the model's full ImageNet label set ----
 # 1000 rows is well over one producer batch, so over the http transport this

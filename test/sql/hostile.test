@@ -8,7 +8,7 @@ statement ok
 LOAD vgi;
 
 statement ok
-ATTACH 'vision' AS vision (TYPE vgi, LOCATION '${VGI_VISION_WORKER}');
+ATTACH 'vision' AS vision (TYPE vgi, LOCATION '{VGI_VISION_WORKER}');
 
 # ---- garbage BLOB bytes -> NULL (worker survives hostile input) ----
 
