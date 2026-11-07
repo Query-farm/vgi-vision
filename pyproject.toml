@@ -1,6 +1,6 @@
 [project]
 name = "vgi-vision"
-version = "0.1.0"
+version = "0.2.0"
 description = "Image classification (ImageNet) on image blobs as DuckDB SQL functions via VGI"
 readme = "README.md"
 keywords = [
