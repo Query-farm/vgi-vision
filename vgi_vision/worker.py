@@ -62,7 +62,7 @@ def _trusted(table: str, constraint_id: str, kind: str, columns: list[list[str]]
     )
 
 
-_CATALOG_TITLE = "Image Classification (ImageNet)"
+_CATALOG_TITLE = "Image Classification"
 
 _CATALOG_KEYWORDS = [
     "image classification",
@@ -134,7 +134,7 @@ _CATALOG_DOC_MD = (
     "a crash, making the functions safe to apply across an entire column of user-supplied data."
 )
 
-_SCHEMA_TITLE = "Vision — main schema"
+_SCHEMA_TITLE = "Classification Functions"
 
 _SCHEMA_KEYWORDS = [
     "image classification",
@@ -208,7 +208,7 @@ _SCHEMA_EXAMPLE_QUERIES = json.dumps(
 # namespaces (relation vs. function), so both call styles work. (A plain view over a
 # parameterless table function would be pure indirection — VGI145 — so this is a
 # function-backed table instead.)
-_CLASSES_VIEW_TITLE = "ImageNet Class List (table)"
+_CLASSES_VIEW_TITLE = "ImageNet Classes"
 
 _CLASSES_VIEW_DOC_LLM = (
     "The classifier's entire ImageNet-1k label set as a queryable table of `(idx, label)` rows — "
@@ -358,6 +358,10 @@ _AGENT_TEST_TASKS = json.dumps(
 
 _CATALOG_TAGS = {
     "vgi.title": _CATALOG_TITLE,
+    "vgi.subtitle": (
+        "Label images with a MobileNet model, returning the top ImageNet class or "
+        "the top predictions with confidence scores."
+    ),
     "vgi.agent_test_tasks": _AGENT_TEST_TASKS,
     "vgi.keywords": keywords_json(_CATALOG_KEYWORDS),
     "vgi.doc_llm": _CATALOG_DOC_LLM,
