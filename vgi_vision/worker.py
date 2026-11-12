@@ -120,14 +120,12 @@ _CATALOG_DOC_MD = (
     "for a commercial marketplace, unlike copyleft alternatives. The model and its 1000 labels "
     "are downloaded once on first use and cached locally, so subsequent queries pay only "
     "inference cost.\n\n"
-    "## Functions\n\n"
-    "- **`top_label(image)` / `top_label(path)`** — scalar: the single #1 predicted ImageNet "
-    "label per row. Ideal as a per-row enrichment column over a table of image blobs.\n"
-    "- **`classify(image[, top_k])` / `classify(path[, top_k])`** — table function returning the "
-    "top-k `(label, confidence)` predictions, confidence descending (default top-5).\n"
-    "- **`image_classes()`** — table function listing the model's full `(idx, label)` label set "
-    "(all 1000 ImageNet classes); also exposed as the parenthesis-free view "
-    "`vision.main.image_classes` for discovery and joins.\n\n"
+    "## How it works\n\n"
+    "There are two ways to ask the model about an image: a per-row scalar that returns the "
+    "single most probable ImageNet label, ideal as an enrichment column, and a table function "
+    "that returns the top-k `(label, confidence)` predictions in descending confidence. The "
+    "model's full 1000-class label set is also published as a browsable table, so predicted "
+    "labels can be validated or joined against the vocabulary the model actually knows.\n\n"
     "## Notes\n\n"
     "Every image argument is accepted either as a `BLOB` column or via a filesystem-path "
     "overload. Untrusted or malformed images yield SQL `NULL` (scalar) or no rows (table), never "
@@ -160,13 +158,10 @@ _SCHEMA_DOC_LLM = (
 )
 
 _SCHEMA_DOC_MD = (
-    "## Vision functions\n\n"
-    "Image classification over a MobileNetV2 ImageNet-1k ONNX model.\n\n"
-    "| function | kind | returns |\n"
-    "|---|---|---|\n"
-    "| `top_label(image\\|path)` | scalar | the #1 predicted label |\n"
-    "| `classify(image\\|path[, top_k])` | table | top-k `(label, confidence)` |\n"
-    "| `image_classes()` | table | the full `(idx, label)` label set |\n\n"
+    "## Image classification\n\n"
+    "Image classification over a MobileNetV2 ImageNet-1k ONNX model: label each image with "
+    "its most likely class, rank its top-k candidate classes with confidences, or browse the "
+    "1000-class label vocabulary.\n\n"
     "Images may be `BLOB` columns or filesystem paths; bad images yield NULL / no rows."
 )
 
