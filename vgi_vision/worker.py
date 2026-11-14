@@ -18,8 +18,8 @@ Usage:
     ATTACH 'vision' (TYPE vgi, LOCATION 'vgi-vision-worker');
 
     SELECT vision.top_label(image)                 FROM photos;
-    SELECT * FROM vision.classify((SELECT image FROM photos LIMIT 1));
-    SELECT * FROM vision.classify((SELECT image FROM photos LIMIT 1), 10);
+    SELECT * FROM vision.classify('/photos/cat.jpg');      -- top 5
+    SELECT * FROM vision.classify('/photos/cat.jpg', 10);  -- top 10
     SELECT * FROM vision.image_classes();          -- 1000 ImageNet labels
 
 The model + labels are downloaded on first use and cached under
@@ -36,7 +36,12 @@ from vgi import Worker
 from vgi.catalog import Catalog, ConstraintInfo, Schema, Table, constraint_record
 
 from vgi_vision import model
-from vgi_vision._examples import SAMPLE_IMAGE_BLOB
+from vgi_vision._examples import (
+    COMPOSED_CLASSIFY_WITH_INDEX,
+    COMPOSED_DOG_PROBABILITY,
+    COMPOSED_TOP_LABEL_WITH_INDEX,
+    SAMPLE_IMAGE_BLOB,
+)
 from vgi_vision.meta import keywords_json
 from vgi_vision.scalars import SCALAR_FUNCTIONS
 from vgi_vision.tables import TABLE_FUNCTIONS, ImageClassesFunction
@@ -170,8 +175,10 @@ _SCHEMA_DOC_MD = (
 # classify examples use a BLOB literal so they are self-contained (no `photos` table, no
 # subquery argument, which DuckDB rejects for table functions) and project + order rather
 # than dumping `SELECT *`. Each BLOB literal is ~1.6k chars, so the list keeps only two of
-# them to stay under the 4,000-char agent-context bound per tag (VGI417); the explicit
-# `top_k` overload is shown in the classify function's own examples.
+# them to stay well under the 8,000-char bound on example-query lists (VGI417); the
+# explicit `top_k` overload is shown in the classify function's own examples. The
+# composed examples (defined once in `_examples`) join a prediction function to the
+# `image_classes` lookup table.
 _SCHEMA_EXAMPLE_QUERIES = json.dumps(
     [
         {
@@ -193,6 +200,9 @@ _SCHEMA_EXAMPLE_QUERIES = json.dumps(
             "description": "Peek at the first five (idx, label) class rows.",
             "sql": "SELECT idx, label FROM vision.main.image_classes() WHERE idx < 5 ORDER BY idx",
         },
+        COMPOSED_CLASSIFY_WITH_INDEX,
+        COMPOSED_DOG_PROBABILITY,
+        COMPOSED_TOP_LABEL_WITH_INDEX,
     ]
 )
 
@@ -212,7 +222,9 @@ _CLASSES_VIEW_DOC_LLM = (
     "Use it to discover or validate which labels "
     "`top_label`/`classify` can return, or to join predicted labels against the canonical class "
     "list. `idx` is the 0-based position into the model's output vector; `label` is the "
-    "human-readable class name. Always returns exactly 1000 rows."
+    "human-readable class name. Always returns exactly 1000 rows, but only 998 distinct "
+    "labels: `crane` (idx 134 bird, 517 machine) and `maillot` (638, 639) each appear twice, "
+    "so a join on `label` fans those two out."
 )
 
 _CLASSES_VIEW_DOC_MD = (
@@ -310,7 +322,8 @@ _SCHEMA_CATEGORIES = json.dumps(
 # grader fields live in the private `vgi-agent-tests.yaml` sidecar at the repo
 # root; this public tag carries only {name, prompt}. Tasks are kept deterministic
 # (the model + the committed sample image are fixed) and jointly exercise every
-# object: the two `image_classes` discovery tasks, `top_label`, and `classify`.
+# object: the two `image_classes` discovery tasks, `top_label`, and `classify`, plus a
+# composed task joining `classify`'s full distribution to `image_classes`.
 _AGENT_TEST_TASKS = json.dumps(
     [
         {
@@ -346,6 +359,15 @@ _AGENT_TEST_TASKS = json.dumps(
             "prompt": (
                 "For that same sample image, return the three most confident predicted "
                 "ImageNet labels in a single column named `label` (the top-3 predictions)."
+            ),
+        },
+        {
+            "name": "most-likely-animal-class-of-sample-image",
+            "prompt": (
+                "ImageNet orders its classes so that class indexes 0 through 397 are animals. "
+                "Considering the model's predictions over all 1000 classes for that same "
+                "sample image, which animal class is the most probable? Return one row with "
+                "columns `idx` (INTEGER class index) and `label` (VARCHAR)."
             ),
         },
     ]
@@ -399,12 +421,13 @@ _VISION_CATALOG = Catalog(
                     comment="The model's ImageNet label set: (idx, label), 1000 rows",
                     cardinality_estimate=model.NUM_CLASSES,
                     cardinality_max=model.NUM_CLASSES,
-                    # The class index is the row identity (0..999); the label text is
-                    # likewise distinct across the fixed 1000-class label set.
+                    # The class index is the row identity (0..999). The label text is NOT
+                    # unique -- ImageNet lists "crane" and "maillot" twice each -- so no
+                    # UNIQUE constraint on `label` (a trusted one would be a false promise
+                    # DuckDB may optimize on).
                     constraints=(
                         _trusted("image_classes", "pk", "PRIMARY_KEY", [["idx"]]),
                         _trusted("image_classes", "label_not_null", "NOT_NULL", [["label"]]),
-                        _trusted("image_classes", "label_unique", "UNIQUE", [["label"]]),
                     ),
                     column_comments={
                         "idx": "0-based class index into the model's output vector.",

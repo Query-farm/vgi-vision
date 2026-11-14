@@ -40,7 +40,7 @@ from vgi_rpc import ArrowSerializableDataclass
 from vgi_rpc.rpc import OutputCollector
 
 from . import model
-from ._examples import SAMPLE_IMAGE_BLOB
+from ._examples import COMPOSED_CLASSIFY_WITH_INDEX, COMPOSED_DOG_PROBABILITY, SAMPLE_IMAGE_BLOB
 from .meta import object_tags
 from .scalars import _SAMPLE_IMAGE_PATH, _read_path
 from .schema_utils import field
@@ -211,7 +211,9 @@ _CLASSES_DOC_LLM = (
     "validate which labels `top_label`/`classify` can return, to join predicted labels "
     "against the canonical class list, or to populate a dropdown/lookup of recognizable "
     "subjects. `idx` is the 0-based position into the model's output vector; `label` is the "
-    "human-readable class name. Always returns exactly 1000 rows (the model is fixed)."
+    "human-readable class name. Always returns exactly 1000 rows (the model is fixed), but "
+    "only 998 distinct labels: `crane` (idx 134 bird, 517 machine) and `maillot` (638, 639) "
+    "each appear twice, so a join on `label` fans those two out."
 )
 
 _CLASSES_DOC_MD = (
@@ -281,6 +283,15 @@ _CLASSIFY_EXAMPLES_DATA = [
     },
 ]
 _CLASSIFY_EXAMPLES = json.dumps(_CLASSIFY_EXAMPLES_DATA)
+
+# The browsable ``vgi.example_queries`` list additionally carries the composed
+# classify + image_classes examples, placed within the first five entries (the
+# agent simulator shows only those). They are kept out of ``vgi.executable_examples``
+# because that tag is capped at 4,000 chars (VGI417) and the two BLOB literals above
+# already use most of it; the example-query list is allowed 8,000.
+_CLASSIFY_EXAMPLE_QUERIES = json.dumps(
+    [_CLASSIFY_EXAMPLES_DATA[0], COMPOSED_CLASSIFY_WITH_INDEX, COMPOSED_DOG_PROBABILITY, *_CLASSIFY_EXAMPLES_DATA[1:]]
+)
 
 _CLASSES_EXAMPLES_DATA = [
     {
@@ -360,7 +371,7 @@ class ClassifyFunction(TableFunctionGenerator[_ClassifyBlobArgs, ScanState]):
             ),
             "vgi.category": "Image Classification",
             "vgi.result_columns_schema": _CLASSIFY_RESULT_SCHEMA,
-            "vgi.example_queries": _CLASSIFY_EXAMPLES,
+            "vgi.example_queries": _CLASSIFY_EXAMPLE_QUERIES,
             "vgi.executable_examples": _CLASSIFY_EXAMPLES,
         }
 
@@ -404,7 +415,7 @@ class ClassifyTopKFunction(TableFunctionGenerator[_ClassifyBlobTopKArgs, ScanSta
             ),
             "vgi.category": "Image Classification",
             "vgi.result_columns_schema": _CLASSIFY_RESULT_SCHEMA,
-            "vgi.example_queries": _CLASSIFY_EXAMPLES,
+            "vgi.example_queries": _CLASSIFY_EXAMPLE_QUERIES,
             "vgi.executable_examples": _CLASSIFY_EXAMPLES,
         }
 
@@ -465,7 +476,7 @@ class ClassifyPathFunction(TableFunctionGenerator[_ClassifyPathArgs, ScanState])
             ),
             "vgi.category": "Image Classification",
             "vgi.result_columns_schema": _CLASSIFY_RESULT_SCHEMA,
-            "vgi.example_queries": _CLASSIFY_EXAMPLES,
+            "vgi.example_queries": _CLASSIFY_EXAMPLE_QUERIES,
             "vgi.executable_examples": _CLASSIFY_EXAMPLES,
         }
 
@@ -509,7 +520,7 @@ class ClassifyPathTopKFunction(TableFunctionGenerator[_ClassifyPathTopKArgs, Sca
             ),
             "vgi.category": "Image Classification",
             "vgi.result_columns_schema": _CLASSIFY_RESULT_SCHEMA,
-            "vgi.example_queries": _CLASSIFY_EXAMPLES,
+            "vgi.example_queries": _CLASSIFY_EXAMPLE_QUERIES,
             "vgi.executable_examples": _CLASSIFY_EXAMPLES,
         }
 

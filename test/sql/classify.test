@@ -104,5 +104,36 @@ LIMIT 1;
 ----
 true
 
+# ---- composed: classify / top_label joined to the image_classes lookup ----
+# (the same SQL the composed catalog examples publish; see vgi_vision/_examples.py)
+
+# ImageNet lists 1000 classes but only 998 distinct labels ("crane" and "maillot"
+# appear twice), so image_classes must not be declared UNIQUE on label.
+query II
+SELECT count(*), count(DISTINCT label) FROM vision.main.image_classes;
+----
+1000	998
+
+# Top-10 predictions joined to the class list recover each label's idx.
+query III
+SELECT c.idx, p.label, round(p.confidence, 4) AS confidence FROM vision.main.classify('test/sql/data/sample.png', 10) AS p JOIN vision.main.image_classes AS c USING (label) ORDER BY p.confidence DESC LIMIT 3;
+----
+549	envelope	0.1352
+722	ping-pong ball	0.0981
+419	Band Aid	0.0729
+
+# Dog-breed roll-up over the full 1000-class distribution (idx 151-268).
+query IIT
+SELECT count(*) AS n_breeds, round(sum(p.confidence), 4) AS dog_probability, arg_max(p.label, p.confidence) AS likeliest_breed FROM vision.main.classify('test/sql/data/sample.png', 1000) AS p JOIN vision.main.image_classes AS c USING (label) WHERE c.idx BETWEEN 151 AND 268;
+----
+118	0.024	Sealyham terrier
+
+# top_label over a list of files, looked up in image_classes; a missing file keeps a NULL row.
+query TIT
+SELECT f.path, c.idx, c.label FROM (VALUES ('test/sql/data/sample.png'), ('test/sql/data/missing.png')) AS f(path) LEFT JOIN vision.main.image_classes AS c ON c.label = vision.main.top_label(f.path) ORDER BY f.path;
+----
+test/sql/data/missing.png	NULL	NULL
+test/sql/data/sample.png	549	envelope
+
 statement ok
 DETACH vision;

@@ -23,10 +23,22 @@ INSTALL vgi FROM community; LOAD vgi;
 ATTACH 'vision' (TYPE vgi, LOCATION 'uvx --from git+https://github.com/Query-farm/vgi-vision@v0.4.0 vgi-vision-worker');
 
 SELECT id, vision.top_label(image)                       FROM photos;
-SELECT * FROM vision.classify((SELECT image FROM photos LIMIT 1));      -- top 5
-SELECT * FROM vision.classify((SELECT image FROM photos LIMIT 1), 10);  -- top 10
+SELECT * FROM vision.classify('/photos/cat.jpg');                       -- top 5
+SELECT * FROM vision.classify('/photos/cat.jpg', 10);                   -- top 10
 SELECT * FROM vision.image_classes();                                   -- 1000 labels
+
+-- Combine them: keep only the photos whose top label is a dog breed
+-- (ImageNet class indexes 151-268), looked up in the class list.
+SELECT p.id, c.label AS breed
+FROM photos AS p
+JOIN vision.image_classes AS c ON c.label = vision.top_label(p.image)
+WHERE c.idx BETWEEN 151 AND 268
+ORDER BY p.id;
 ```
+
+`classify` takes its image as a literal (a `BLOB` or a file path); DuckDB does not
+accept a `(SELECT ...)` subquery or a lateral column reference as a table-function
+argument, so use the `top_label` scalar to label a whole column.
 
 Inference runs out-of-process on a permissively-licensed ONNX model via
 [onnxruntime](https://onnxruntime.ai/). The model + labels are downloaded on
@@ -112,7 +124,7 @@ labels are pinned.
 |----------|------|---------|-------|
 | `classify(image[, top_k])` | table | `(label VARCHAR, confidence DOUBLE)` | Top-k predictions (default `top_k=5`), ordered by `confidence` desc. `image` is a BLOB; a `classify(path[, top_k])` VARCHAR overload reads a file off disk. |
 | `top_label(image)` | scalar | `VARCHAR` | The #1 predicted label. BLOB input; `top_label(path)` VARCHAR overload reads a file. |
-| `image_classes()` | table | `(idx INT, label VARCHAR)` | The model's full 1000-class ImageNet label set. |
+| `image_classes()` | table | `(idx INT, label VARCHAR)` | The model's full 1000-class ImageNet label set. Only 998 labels are distinct: `crane` and `maillot` each appear at two indexes. |
 
 `confidence` values are softmax probabilities in `[0, 1]`.
 

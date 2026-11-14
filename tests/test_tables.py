@@ -37,6 +37,34 @@ class TestImageClasses:
         idx = table.column("idx").to_pylist()
         assert idx == list(range(1000))
 
+    @needs_model
+    def test_declared_constraints_hold(self) -> None:
+        """Every trusted (ENFORCED/ALL_ROWS) constraint on the image_classes table is true.
+
+        Regression: the table once declared ``label`` UNIQUE, but ImageNet lists
+        "crane" and "maillot" twice each, so DuckDB was promised a false invariant.
+        """
+        from vgi_vision.worker import _VISION_CATALOG
+
+        table = invoke_table_function(ImageClassesFunction)
+        (classes_table,) = [t for t in _VISION_CATALOG.schemas[0].tables if t.name == "image_classes"]
+        for constraint in classes_table.constraints:
+            definition = constraint.definition
+            cols = [table.column(path[0]).to_pylist() for path in definition.column_paths]
+            rows = list(zip(*cols, strict=True))
+            if definition.kind.value in ("PRIMARY_KEY", "UNIQUE"):
+                assert len(set(rows)) == len(rows), constraint.ref.name
+            if definition.kind.value in ("PRIMARY_KEY", "NOT_NULL"):
+                assert all(v is not None for row in rows for v in row), constraint.ref.name
+
+    @needs_model
+    def test_duplicate_labels(self) -> None:
+        """The label set has exactly two duplicated labels (documented in the metadata)."""
+        labels = invoke_table_function(ImageClassesFunction).column("label").to_pylist()
+        dupes = sorted({lab for lab in labels if labels.count(lab) > 1})
+        assert dupes == ["crane", "maillot"]
+        assert len(set(labels)) == 998
+
 
 class TestClassify:
     @needs_model
