@@ -1,0 +1,28 @@
+{
+  "photo": {
+    "name": "Chelsea the cat",
+    "photographer": "Stefan van der Walt",
+    "license": "CC0",
+    "license_evidence": "https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.chelsea",
+    "url": "https://raw.githubusercontent.com/scikit-image/scikit-image/e8a42ba85aaf5fd9322ef9ca51bc21063b22fcae/skimage/data/chelsea.png",
+    "revision": "e8a42ba85aaf5fd9322ef9ca51bc21063b22fcae",
+    "sha256": "596aa1e7cb875eb79f437e310381d26b338a81c2da23439704a73c4651e8c4bb",
+    "bytes": 240512,
+    "captured_at_utc": "2026-11-14T10:45:54.263648+00:00",
+    "changes": "None: original PNG bytes."
+  },
+  "synthetic": [
+    {
+      "file": "checkerboard.png",
+      "sha256": "621152fe166187a55fc1fe30b15e347e073c8f2952452c2d2f633214388c1c4d",
+      "generator": "generate_fixture.py",
+      "license": "MIT (Query Farm LLC)"
+    },
+    {
+      "file": "invalid.bin",
+      "sha256": "5f6cbccc4ae119cf0bb3529c4194b4bc5472ef96fa1bb5b14a330519685a9487",
+      "generator": "generate_fixture.py",
+      "license": "MIT (Query Farm LLC)"
+    }
+  ]
+}

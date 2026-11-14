@@ -184,3 +184,7 @@ Written by [Query.Farm](https://query.farm).
 
 Copyright 2026 Query Farm LLC - https://query.farm
 
+
+## Executed notebooks
+
+[Explore top-K classification and omitted score mass](notebooks/README.md) with a portable, executed Haybarn/VGI walkthrough and licensed image inputs.
