@@ -365,8 +365,9 @@ _AGENT_TEST_TASKS = json.dumps(
             "name": "most-likely-animal-class-of-sample-image",
             "prompt": (
                 "ImageNet orders its classes so that class indexes 0 through 397 are animals. "
-                "Considering the model's predictions over all 1000 classes for that same "
-                "sample image, which animal class is the most probable? Return one row with "
+                "Considering the model's predictions over all 1000 classes for the sample "
+                "image at file path 'test/sql/data/sample.png', which animal class is the most "
+                "probable? Return one row with "
                 "columns `idx` (INTEGER class index) and `label` (VARCHAR)."
             ),
         },
