@@ -1,0 +1,30 @@
+{
+  "query": "DESCRIBE SELECT * FROM vision.main.classify('fixtures/checkerboard.png',5)",
+  "captured_at": "2026-11-14T22:34:20.576653+00:00",
+  "columns": [
+    "column_name",
+    "column_type",
+    "null",
+    "key",
+    "default",
+    "extra"
+  ],
+  "rows": [
+    [
+      "label",
+      "VARCHAR",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "confidence",
+      "DOUBLE",
+      "YES",
+      null,
+      null,
+      null
+    ]
+  ]
+}

@@ -3,3 +3,7 @@ __pycache__/
 .ipynb_checkpoints/
 validation/
 model-cache/
+artifacts/
+.vgi-examples/
+.ruff_cache/
+kernel-ipc-*

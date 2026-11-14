@@ -1,0 +1,275 @@
+{
+  "schema_version": 1,
+  "status": "met",
+  "meets_target": true,
+  "catalogs": {
+    "released": {
+      "catalog_status": "verified",
+      "revision": "v0.4.0",
+      "catalog_sha256": "56926d3067bfa6260838e4c7c138e519ff2d4ecc288f2da794523ec61e7059e1",
+      "collection_reconciled": true,
+      "denominator": 3,
+      "observed_objects": 3,
+      "required": 3,
+      "verified_count": 3,
+      "candidate_count": 0,
+      "fraction": 1.0,
+      "meets_target": true,
+      "exact_runtime_count": 3,
+      "runtime_revisions": [
+        "v0.4.0"
+      ],
+      "covered": [
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "classify"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "image_classes"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "top_label"
+        }
+      ],
+      "uncovered": [],
+      "objects": [
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "classify",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "classify(image BLOB) -> TABLE(label VARCHAR, confidence DOUBLE)",
+            "classify(image BLOB, top_k BIGINT) -> TABLE(label VARCHAR, confidence DOUBLE)",
+            "classify(path VARCHAR) -> TABLE(label VARCHAR, confidence DOUBLE)",
+            "classify(path VARCHAR, top_k BIGINT) -> TABLE(label VARCHAR, confidence DOUBLE)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "image_classes",
+          "kinds": [
+            "function",
+            "table"
+          ],
+          "signatures": [
+            "TABLE(idx INTEGER, label VARCHAR)",
+            "image_classes() -> TABLE(idx INTEGER, label VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "top_label",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "top_label(image BLOB) -> VARCHAR",
+            "top_label(path VARCHAR) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        }
+      ],
+      "issues": []
+    },
+    "current": {
+      "catalog_status": "verified",
+      "revision": "aa30023808f21a34c91bcfdd0a581836dd757ff8",
+      "catalog_sha256": "dcf6edd2c4725424e6877d2bb495652118cb0003c1dbb8172e7c60f90775bb60",
+      "collection_reconciled": true,
+      "denominator": 3,
+      "observed_objects": 3,
+      "required": 3,
+      "verified_count": 3,
+      "candidate_count": 0,
+      "fraction": 1.0,
+      "meets_target": true,
+      "exact_runtime_count": 0,
+      "runtime_revisions": [
+        "v0.4.0"
+      ],
+      "covered": [
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "classify"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "image_classes"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "top_label"
+        }
+      ],
+      "uncovered": [],
+      "objects": [
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "classify",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "classify(image BLOB) -> TABLE(label VARCHAR, confidence DOUBLE)",
+            "classify(image BLOB, top_k BIGINT) -> TABLE(label VARCHAR, confidence DOUBLE)",
+            "classify(path VARCHAR) -> TABLE(label VARCHAR, confidence DOUBLE)",
+            "classify(path VARCHAR, top_k BIGINT) -> TABLE(label VARCHAR, confidence DOUBLE)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "image_classes",
+          "kinds": [
+            "function",
+            "table"
+          ],
+          "signatures": [
+            "TABLE(idx INTEGER, label VARCHAR)",
+            "image_classes() -> TABLE(idx INTEGER, label VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "top_label",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "top_label(image BLOB) -> VARCHAR",
+            "top_label(path VARCHAR) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        }
+      ],
+      "issues": []
+    }
+  },
+  "interface_drift": {
+    "known": true,
+    "current_only": [],
+    "released_only": [],
+    "changed": []
+  },
+  "notebooks": {
+    "01_top_k_and_score_mass.ipynb": {
+      "verified": true,
+      "issues": []
+    }
+  },
+  "examples": [
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "image_classes"
+      },
+      "notebook": "01_top_k_and_score_mass.ipynb",
+      "runtime_revision": "v0.4.0",
+      "runtime_catalog_sha256": "56926d3067bfa6260838e4c7c138e519ff2d4ecc288f2da794523ec61e7059e1"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "top_label"
+      },
+      "notebook": "01_top_k_and_score_mass.ipynb",
+      "runtime_revision": "v0.4.0",
+      "runtime_catalog_sha256": "56926d3067bfa6260838e4c7c138e519ff2d4ecc288f2da794523ec61e7059e1"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "classify"
+      },
+      "notebook": "01_top_k_and_score_mass.ipynb",
+      "runtime_revision": "v0.4.0",
+      "runtime_catalog_sha256": "56926d3067bfa6260838e4c7c138e519ff2d4ecc288f2da794523ec61e7059e1"
+    }
+  ],
+  "issues": []
+}

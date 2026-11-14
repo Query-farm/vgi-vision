@@ -1,0 +1,86 @@
+{
+  "query": "SELECT * FROM duckdb_constraints() WHERE database_name='vision'",
+  "captured_at": "2026-11-14T22:34:20.574068+00:00",
+  "columns": [
+    "database_name",
+    "database_oid",
+    "schema_name",
+    "schema_oid",
+    "table_name",
+    "table_oid",
+    "constraint_index",
+    "constraint_type",
+    "constraint_text",
+    "expression",
+    "constraint_column_indexes",
+    "constraint_column_names",
+    "constraint_name",
+    "referenced_table",
+    "referenced_column_names"
+  ],
+  "rows": [
+    [
+      "vision",
+      22592,
+      "main",
+      22593,
+      "image_classes",
+      22788,
+      0,
+      "NOT NULL",
+      "NOT NULL",
+      null,
+      [
+        1
+      ],
+      [
+        "label"
+      ],
+      "image_classes_label_not_null",
+      null,
+      []
+    ],
+    [
+      "vision",
+      22592,
+      "main",
+      22593,
+      "image_classes",
+      22788,
+      1,
+      "UNIQUE",
+      "UNIQUE(\"label\")",
+      null,
+      [
+        1
+      ],
+      [
+        "label"
+      ],
+      "image_classes_label_key",
+      null,
+      []
+    ],
+    [
+      "vision",
+      22592,
+      "main",
+      22593,
+      "image_classes",
+      22788,
+      2,
+      "PRIMARY KEY",
+      "PRIMARY KEY(idx)",
+      null,
+      [
+        0
+      ],
+      [
+        "idx"
+      ],
+      "image_classes_idx_pkey",
+      null,
+      []
+    ]
+  ]
+}

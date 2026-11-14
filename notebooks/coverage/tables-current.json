@@ -1,0 +1,53 @@
+{
+  "query": "SELECT * FROM duckdb_tables() WHERE database_name='vision'",
+  "captured_at": "2026-11-14T22:34:26.284300+00:00",
+  "columns": [
+    "database_name",
+    "database_oid",
+    "schema_name",
+    "schema_oid",
+    "table_name",
+    "table_oid",
+    "comment",
+    "tags",
+    "internal",
+    "temporary",
+    "has_primary_key",
+    "estimated_size",
+    "column_count",
+    "index_count",
+    "check_constraint_count",
+    "sql"
+  ],
+  "rows": [
+    [
+      "vision",
+      22592,
+      "main",
+      22593,
+      "image_classes",
+      22788,
+      "The model's ImageNet label set: (idx, label), 1000 rows",
+      {
+        "category": "image-classification",
+        "domain": "computer-vision",
+        "topic": "imagenet-labeling",
+        "vgi.category": "Class Labels",
+        "vgi.doc_llm": "The classifier's entire ImageNet-1k label set as a queryable table of `(idx, label)` rows \u2014 all 1000 classes the model can predict \u2014 so it reads like a normal table you query without parentheses, unlike the parenthesized `image_classes()` table function it scans. Use it to discover or validate which labels `top_label`/`classify` can return, or to join predicted labels against the canonical class list. `idx` is the 0-based position into the model's output vector; `label` is the human-readable class name. Always returns exactly 1000 rows, but only 998 distinct labels: `crane` (idx 134 bird, 517 machine) and `maillot` (638, 639) each appear twice, so a join on `label` fans those two out.",
+        "vgi.doc_md": "## `image_classes` (table)\n\nA scan-backed table listing **every ImageNet-1k class** the model can predict (1000 rows), queried without parentheses (`vision.main.image_classes`) \u2014 the same data the `image_classes()` table function returns.\n\n### Columns\n\n| column | type | description |\n|---|---|---|\n| `idx` | INTEGER | 0-based class index into the model output |\n| `label` | VARCHAR | ImageNet class label |\n\n### Notes\n\nUseful to validate or join against predicted labels from `top_label` / `classify`.",
+        "vgi.example_queries": "[{\"description\": \"Count the ImageNet classes the model can predict (1000).\", \"sql\": \"SELECT count(*) AS n FROM vision.main.image_classes\"}, {\"description\": \"Peek at the first five (idx, label) class rows.\", \"sql\": \"SELECT idx, label FROM vision.main.image_classes WHERE idx < 5 ORDER BY idx\"}]",
+        "vgi.executable_examples": "[{\"description\": \"Count the ImageNet classes the model can predict (1000).\", \"sql\": \"SELECT count(*) AS n FROM vision.main.image_classes\"}, {\"description\": \"Peek at the first five (idx, label) class rows.\", \"sql\": \"SELECT idx, label FROM vision.main.image_classes WHERE idx < 5 ORDER BY idx\"}]",
+        "vgi.keywords": "[\"image classes\", \"labels\", \"ImageNet\", \"class list\", \"vocabulary\", \"categories\", \"discovery\", \"enumerate\", \"idx\", \"label\", \"1000 classes\", \"vision\", \"table\"]",
+        "vgi.title": "ImageNet Classes"
+      },
+      false,
+      false,
+      true,
+      0,
+      2,
+      1,
+      0,
+      "CREATE TABLE image_classes(idx INTEGER, \"label\" VARCHAR NOT NULL, PRIMARY KEY(idx));"
+    ]
+  ]
+}

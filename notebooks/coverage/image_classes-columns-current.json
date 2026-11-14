@@ -1,0 +1,30 @@
+{
+  "query": "DESCRIBE SELECT * FROM vision.main.image_classes()",
+  "captured_at": "2026-11-14T22:34:26.288285+00:00",
+  "columns": [
+    "column_name",
+    "column_type",
+    "null",
+    "key",
+    "default",
+    "extra"
+  ],
+  "rows": [
+    [
+      "idx",
+      "INTEGER",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "label",
+      "VARCHAR",
+      "YES",
+      null,
+      null,
+      null
+    ]
+  ]
+}

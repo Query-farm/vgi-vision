@@ -1,0 +1,26 @@
+{
+  "release": "v0.4.0",
+  "release_commit": "79393adf13923a964895ee9708f3beabbf35d469",
+  "current_revision": "aa30023808f21a34c91bcfdd0a581836dd757ff8",
+  "root_dependencies_unchanged": true,
+  "model_logic_unchanged": true,
+  "source_ci": {
+    "url": "https://github.com/Query-farm/vgi-vision/actions/runs/43587336715",
+    "revision": "aa30023808f21a34c91bcfdd0a581836dd757ff8",
+    "conclusion": "success"
+  },
+  "runtime": "Haybarn2.0.0rc11",
+  "launch": "uvx --python 3.13 --from git+https://github.com/Query-farm/vgi-vision@v0.4.0 vgi-vision-worker",
+  "source_review": "Current adds composed metadata examples/docs and removes false trusted UNIQUE(label) from image_classes catalog table. Release retains that declaration despite998distinct labels/1000indexes. Notebook uses callable image_classes(), materializes ordinary local table, audits duplicates and never relies on source catalog-table uniqueness. Model/preprocessing/inference logic and root dependencies unchanged; actual callable signatures/results match.",
+  "metadata_provenance": "Actual catalog-metadata.json vgi.title/vgi.subtitle.",
+  "constraints_limitation": "Catalog-table constraints differ despite same callable/column signatures; both raw duckdb_constraints exports retained. Named-surface coverage is not a claim that every access kind or every overload was executed.",
+  "worker_package_versions": {
+    "vgi-python": "0.51.1",
+    "vgi-rpc": "0.53.1",
+    "onnxruntime": "1.32.0",
+    "Pillow": "13.0.0",
+    "numpy": "2.5.4",
+    "huggingface-hub": "2.4.0",
+    "pyarrow": "26.0.1"
+  }
+}

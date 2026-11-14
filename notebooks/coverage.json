@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "catalogs": {
+    "released": {
+      "path": "coverage/catalog-released.json",
+      "sha256": "56926d3067bfa6260838e4c7c138e519ff2d4ecc288f2da794523ec61e7059e1",
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T22:39:51.719556+00:00",
+        "catalog_sha256": "56926d3067bfa6260838e4c7c138e519ff2d4ecc288f2da794523ec61e7059e1",
+        "notes": "Complete actual seven function overloads plus one table group to three names. Same callable/column signatures; current removes erroneous trusted UNIQUE(label) from table metadata. Notebook calls image_classes() into ordinary local table and explicitly audits duplicate names. Model logic/root dependencies unchanged; current-main notebooks not separately executed."
+      }
+    },
+    "current": {
+      "path": "coverage/catalog-current.json",
+      "sha256": "dcf6edd2c4725424e6877d2bb495652118cb0003c1dbb8172e7c60f90775bb60",
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T22:39:51.719556+00:00",
+        "catalog_sha256": "dcf6edd2c4725424e6877d2bb495652118cb0003c1dbb8172e7c60f90775bb60",
+        "notes": "Complete actual seven function overloads plus one table group to three names. Same callable/column signatures; current removes erroneous trusted UNIQUE(label) from table metadata. Notebook calls image_classes() into ordinary local table and explicitly audits duplicate names. Model logic/root dependencies unchanged; current-main notebooks not separately executed."
+      }
+    }
+  },
+  "notebooks": [
+    {
+      "path": "01_top_k_and_score_mass.ipynb",
+      "sha256": "70eb72890bc8fc5a80d21292ea1977ad65fcfdd455e9735eaad0d6e4a395e30c",
+      "execution": {
+        "path": "coverage/run-01.json",
+        "sha256": "02b6eae2dad56cbf8fb25594123e166f6a465f0c69d61bcac2eb0c761df71dfc"
+      }
+    }
+  ],
+  "examples": [
+    {
+      "object": {
+        "schema": "main",
+        "name": "image_classes"
+      },
+      "notebook": "01_top_k_and_score_mass.ipynb",
+      "sql": [
+        {
+          "cell": "connection",
+          "reference": "vision.main.image_classes"
+        }
+      ],
+      "narrative_cells": [
+        "reference-story",
+        "scores-story",
+        "checks-story"
+      ],
+      "result_cells": [
+        "vocabulary-finding",
+        "checks-finding"
+      ],
+      "interpretation_cells": [
+        "vocabulary-finding",
+        "reference-story"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T22:39:51.719556+00:00",
+        "notebook_sha256": "70eb72890bc8fc5a80d21292ea1977ad65fcfdd455e9735eaad0d6e4a395e30c",
+        "catalog_sha256": [
+          "56926d3067bfa6260838e4c7c138e519ff2d4ecc288f2da794523ec61e7059e1",
+          "dcf6edd2c4725424e6877d2bb495652118cb0003c1dbb8172e7c60f90775bb60"
+        ],
+        "purpose": "Establish the classifier output vocabulary and prevent false one-to-one joins between names and class indexes.",
+        "finding": "Actual callable returns1000indexes0..999 with998distinct names: crane andmaillot eachrepeat. The independent local table retains duplicates, checks scalar/table labels against membership and never uses release table falseUNIQUE(label). This covers the named surface via callable access, not every alias."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "top_label"
+      },
+      "notebook": "01_top_k_and_score_mass.ipynb",
+      "sql": [
+        {
+          "cell": "connection",
+          "reference": "vision.main.top_label"
+        }
+      ],
+      "narrative_cells": [
+        "availability-story",
+        "source-story",
+        "checks-story"
+      ],
+      "result_cells": [
+        "availability-finding",
+        "mass-finding",
+        "checks-finding"
+      ],
+      "interpretation_cells": [
+        "availability-story",
+        "mass-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T22:39:51.719556+00:00",
+        "notebook_sha256": "70eb72890bc8fc5a80d21292ea1977ad65fcfdd455e9735eaad0d6e4a395e30c",
+        "catalog_sha256": [
+          "56926d3067bfa6260838e4c7c138e519ff2d4ecc288f2da794523ec61e7059e1",
+          "dcf6edd2c4725424e6877d2bb495652118cb0003c1dbb8172e7c60f90775bb60"
+        ],
+        "purpose": "Separate missing/invalid image classification from a forced choice on a valid out-of-domain pattern.",
+        "finding": "BLOB scalar preserves five inputs; missing,empty,malformed returnNULL while photo andcheckerboard receive labels. The checkerboard receives snorkel despite no pictured object. Both labels match highest scored classes; numerical output is not calibrated correctness or an out-of-distribution test."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "classify"
+      },
+      "notebook": "01_top_k_and_score_mass.ipynb",
+      "sql": [
+        {
+          "cell": "reference-query",
+          "reference": "vision.main.classify"
+        }
+      ],
+      "narrative_cells": [
+        "reference-story",
+        "scores-story",
+        "accounting-story",
+        "experiment-story"
+      ],
+      "result_cells": [
+        "reference-fingerprint-finding",
+        "score-chart",
+        "mass-chart",
+        "mass-finding",
+        "checks-finding"
+      ],
+      "interpretation_cells": [
+        "mass-finding",
+        "accounting-story",
+        "experiment-story"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T22:39:51.719556+00:00",
+        "notebook_sha256": "70eb72890bc8fc5a80d21292ea1977ad65fcfdd455e9735eaad0d6e4a395e30c",
+        "catalog_sha256": [
+          "56926d3067bfa6260838e4c7c138e519ff2d4ecc288f2da794523ec61e7059e1",
+          "dcf6edd2c4725424e6877d2bb495652118cb0003c1dbb8172e7c60f90775bb60"
+        ],
+        "purpose": "Quantify omitted softmax mass and distinguish a longer returned list from any model improvement.",
+        "finding": "Literal path calls materialize all1000scores pervalidimage and eachKshortlist once. K5\u219220 retains greatermass with exact2,000fullrowfingerprints/scalarlables/topfivefixed. Scores are not renormalized; multiset membership retains duplicate labels; malformed tableinput emitszerorows. Shared fixedaxes and sourceprovenance keep populations comparable."
+      }
+    }
+  ]
+}

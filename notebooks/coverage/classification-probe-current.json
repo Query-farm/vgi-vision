@@ -1,0 +1,30 @@
+{
+  "query": "SELECT * FROM vision.main.classify('fixtures/checkerboard.png',5) ORDER BY confidence DESC,label",
+  "captured_at": "2026-11-14T22:34:26.343218+00:00",
+  "columns": [
+    "label",
+    "confidence"
+  ],
+  "rows": [
+    [
+      "snorkel",
+      0.02819579488288001
+    ],
+    [
+      "bolo tie",
+      0.025050513987378377
+    ],
+    [
+      "hair slide",
+      0.020227255416131507
+    ],
+    [
+      "stopwatch",
+      0.02005982832599943
+    ],
+    [
+      "strainer",
+      0.018913628830849315
+    ]
+  ]
+}

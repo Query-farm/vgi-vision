@@ -1,0 +1,14 @@
+{
+  "query": "SELECT count(*) AS class_count,count(DISTINCT label) AS labels FROM vision.main.image_classes()",
+  "captured_at": "2026-11-14T22:34:26.301607+00:00",
+  "columns": [
+    "class_count",
+    "labels"
+  ],
+  "rows": [
+    [
+      1000,
+      998
+    ]
+  ]
+}

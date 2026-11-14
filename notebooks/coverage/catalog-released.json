@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "repository": "Query-farm/vgi-vision",
+  "revision": "v0.4.0",
+  "captured_at": "2026-11-14T22:34:20.564537+00:00",
+  "default_schema": "main",
+  "scope": "all_public_functions_and_tables",
+  "complete": true,
+  "evidence": [
+    {
+      "path": "coverage/functions.json",
+      "sha256": "c6f43de90f9f88d89cc6f97c66bf202e37199e26e57cabd8c4d2cc2809e97566",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    },
+    {
+      "path": "coverage/tables.json",
+      "sha256": "8164217917f850c0ab2fd96f55bf20033a6977e6890a74bed2004db134e09fac",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    },
+    {
+      "path": "coverage/views.json",
+      "sha256": "e9dcf92a6bd544997c056a7a58754389f856095cc1ab60ffc72c17d728b45ffc",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    },
+    {
+      "path": "coverage/arguments.json",
+      "sha256": "e70fb1ef3d79e1765d2d146ee3d2c35c08cf515c4a3bb74f5f7acd6c07eb09be",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    },
+    {
+      "path": "coverage/catalog-metadata.json",
+      "sha256": "ca17e8ee54ebb595de3ee9c7dfaf620fcb4e05691f8cc5421d931be422a51104",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    },
+    {
+      "path": "coverage/constraints.json",
+      "sha256": "6e23e2ff430ae7e593a2099e9446d8ec76e3c432718550f2134f25acc6543fe4",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    },
+    {
+      "path": "coverage/image_classes-columns.json",
+      "sha256": "6d8933c9cf5cde48611c69bfaeb8af7059a19238dc2b86855c5a223d4d8c6575",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    },
+    {
+      "path": "coverage/classify-columns.json",
+      "sha256": "e9d3c07aa1d53665c96e8b5917f0781048c5fc012160ef8d66be0fe4706ee7ce",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    },
+    {
+      "path": "coverage/class-probe.json",
+      "sha256": "7e5708b29b8b6ca048eef1532e64c63feabb7f2f07d4595b6c5d625a5f3f3889",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    },
+    {
+      "path": "coverage/classification-probe.json",
+      "sha256": "2cc754ebed72bef9df29897dcab9d875740e62a10a97b8e092677774bf27f2ad",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    },
+    {
+      "path": "coverage/source-compatibility.json",
+      "sha256": "7601bcfef30129b40df8ab2171a892d153254aab3aeaa46f4203e2f45b2918c2",
+      "description": "Actual complete runtime catalog, full arguments/output columns and raw constraint declarations; reviewed source compatibility"
+    }
+  ],
+  "objects": [
+    {
+      "schema": "main",
+      "name": "classify",
+      "kind": "function",
+      "authentication": "none",
+      "access": "read",
+      "signatures": [
+        "classify(image BLOB) -> TABLE(label VARCHAR, confidence DOUBLE)",
+        "classify(image BLOB, top_k BIGINT) -> TABLE(label VARCHAR, confidence DOUBLE)",
+        "classify(path VARCHAR) -> TABLE(label VARCHAR, confidence DOUBLE)",
+        "classify(path VARCHAR, top_k BIGINT) -> TABLE(label VARCHAR, confidence DOUBLE)"
+      ]
+    },
+    {
+      "schema": "main",
+      "name": "image_classes",
+      "kind": "function",
+      "authentication": "none",
+      "access": "read",
+      "signatures": [
+        "image_classes() -> TABLE(idx INTEGER, label VARCHAR)"
+      ]
+    },
+    {
+      "schema": "main",
+      "name": "top_label",
+      "kind": "function",
+      "authentication": "none",
+      "access": "read",
+      "signatures": [
+        "top_label(image BLOB) -> VARCHAR",
+        "top_label(path VARCHAR) -> VARCHAR"
+      ]
+    },
+    {
+      "schema": "main",
+      "name": "image_classes",
+      "kind": "table",
+      "authentication": "none",
+      "access": "read",
+      "signatures": [
+        "TABLE(idx INTEGER, label VARCHAR)"
+      ]
+    }
+  ],
+  "launch": "uvx --python 3.13 --from git+https://github.com/Query-farm/vgi-vision@v0.4.0 vgi-vision-worker",
+  "runtime": "Haybarn2.0.0rc11",
+  "review_notes": "Seven overload rows form three logical names; image_classes catalog table/callable alias counted once. No views/auth/write objects. Current removes false label uniqueness constraint; source compatibility explicitly scopes notebook to callable path."
+}
