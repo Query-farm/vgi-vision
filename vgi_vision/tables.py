@@ -42,7 +42,7 @@ from vgi_rpc.rpc import OutputCollector
 from . import model
 from ._examples import COMPOSED_CLASSIFY_WITH_INDEX, COMPOSED_DOG_PROBABILITY, SAMPLE_IMAGE_BLOB
 from .meta import object_tags
-from .scalars import _SAMPLE_IMAGE_PATH, _read_path
+from .scalars import _read_path
 from .schema_utils import field
 
 _DEFAULT_TOP_K = 5
@@ -249,8 +249,9 @@ _CLASSES_KEYWORDS = [
 # carries the SAME aggregated example set, so whichever overload row DuckDB surfaces the tags
 # on, every example is present and described. Examples project the columns that matter and
 # ORDER BY confidence (not a bare ``SELECT *``; VGI514) so their output is deterministic
-# (VGI510). Self-contained: BLOB literals for the BLOB overloads, the committed fixture path
-# for the path overloads. Built with ``json.dumps`` so the BLOB literal's backslash-x escapes
+# (VGI510). Self-contained: BLOB literals only -- a path-overload example would read a file
+# that exists only in a checkout of this repo (VGI516), and a table function cannot take a
+# read_blob() subquery. Built with ``json.dumps`` so the BLOB literal's backslash-x escapes
 # are valid JSON (VGI507).
 _CLASSIFY_EXAMPLES_DATA = [
     {
@@ -265,20 +266,6 @@ _CLASSIFY_EXAMPLES_DATA = [
         "sql": (
             f"SELECT label, round(confidence, 4) AS confidence "
             f"FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 10) ORDER BY confidence DESC"
-        ),
-    },
-    {
-        "description": "Top-5 predictions for an image read from a filesystem path, confidence-descending.",
-        "sql": (
-            f"SELECT label, round(confidence, 4) AS confidence "
-            f"FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}') ORDER BY confidence DESC"
-        ),
-    },
-    {
-        "description": "Top-3 predictions for an image on a filesystem path (explicit top_k), confidence-descending.",
-        "sql": (
-            f"SELECT label, round(confidence, 4) AS confidence "
-            f"FROM vision.main.classify('{_SAMPLE_IMAGE_PATH}', 3) ORDER BY confidence DESC"
         ),
     },
 ]

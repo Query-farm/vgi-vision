@@ -27,14 +27,12 @@ from vgi.arguments import Param, Returns
 from vgi.scalar_function import ScalarFunction
 
 from . import model
-from ._examples import COMPOSED_TOP_LABEL_WITH_INDEX, SAMPLE_IMAGE_BLOB, SAMPLE_IMAGE_PATH
+from ._examples import COMPOSED_TOP_LABEL_WITH_INDEX, SAMPLE_IMAGE_BLOB, SAMPLE_IMAGE_URL
 from .meta import object_tags
 
 # Cap on bytes read from a path overload -- a path is still untrusted input.
 _MAX_FILE_BYTES = 64 * 1024 * 1024
 
-# The committed image fixture, as a path, for the path-overload examples.
-_SAMPLE_IMAGE_PATH = SAMPLE_IMAGE_PATH
 
 _TOP_LABEL_DOC_LLM = (
     "Return the single most likely ImageNet-1k class label for an image, as a scalar — "
@@ -88,8 +86,8 @@ _TOP_LABEL_EXAMPLES_DATA = [
         "sql": f"SELECT vision.main.top_label('{SAMPLE_IMAGE_BLOB}'::BLOB) AS label",
     },
     {
-        "description": "Predict the top label for an image read from a filesystem path.",
-        "sql": f"SELECT vision.main.top_label('{_SAMPLE_IMAGE_PATH}') AS label",
+        "description": "Predict the top label for an image fetched over HTTPS with read_blob.",
+        "sql": f"SELECT vision.main.top_label(content) AS label FROM read_blob('{SAMPLE_IMAGE_URL}')",
     },
     COMPOSED_TOP_LABEL_WITH_INDEX,
 ]

@@ -178,7 +178,8 @@ _SCHEMA_DOC_MD = (
 # them to stay well under the 8,000-char bound on example-query lists (VGI417); the
 # explicit `top_k` overload is shown in the classify function's own examples. The
 # composed examples (defined once in `_examples`) join a prediction function to the
-# `image_classes` lookup table.
+# `image_classes` lookup table; the two classify ones embed the BLOB literal too, which
+# brings the list to ~7.7k chars, so add no further BLOB-literal example here.
 _SCHEMA_EXAMPLE_QUERIES = json.dumps(
     [
         {
@@ -349,9 +350,9 @@ _AGENT_TEST_TASKS = json.dumps(
             "name": "top-label-of-sample-image",
             "prompt": (
                 "The catalog's examples embed a small sample image as a BLOB literal (and "
-                "also reference it as the file path 'test/sql/data/sample.png'). Using that "
-                "exact sample image, return its single most likely ImageNet label in a "
-                "column named `label`."
+                "also read it from https://raw.githubusercontent.com/Query-farm/vgi-vision/"
+                "v0.4.0/test/sql/data/sample.png). Using that exact sample image, return "
+                "its single most likely ImageNet label in a column named `label`."
             ),
         },
         {
@@ -366,7 +367,7 @@ _AGENT_TEST_TASKS = json.dumps(
             "prompt": (
                 "ImageNet orders its classes so that class indexes 0 through 397 are animals. "
                 "Considering the model's predictions over all 1000 classes for the sample "
-                "image at file path 'test/sql/data/sample.png', which animal class is the most "
+                "image embedded in the catalog's examples, which animal class is the most "
                 "probable? Return one row with "
                 "columns `idx` (INTEGER class index) and `label` (VARCHAR)."
             ),

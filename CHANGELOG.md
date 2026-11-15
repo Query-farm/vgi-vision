@@ -1,0 +1,10 @@
+# Changelog
+
+## 0.4.1 — 2026-11-14
+
+- Examples show real output for every user, not just inside a checkout of this
+  repo (vgi-lint VGI913/VGI516): the path-overload examples that read
+  `test/sql/data/sample.png` are replaced by the embedded BLOB literal for
+  `classify` and by `read_blob()` of the fixture published at the v0.4.0 tag
+  for `top_label`. The composed classify examples and the
+  most-likely-animal agent task use the BLOB literal.

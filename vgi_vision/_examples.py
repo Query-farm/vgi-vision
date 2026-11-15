@@ -38,17 +38,18 @@ SAMPLE_IMAGE_BLOB = (
     r"\x60\x82"
 )
 
-# The committed image fixture, as a path, for the path-overload examples. The
-# linter launches the worker with the repo root as its working directory, so this
-# relative path resolves to the same deterministic PNG the BLOB literal embeds.
-SAMPLE_IMAGE_PATH = "test/sql/data/sample.png"
+# The same committed fixture, fetched over HTTPS from a release tag so the URL resolves
+# for every user (a repo-relative path exists only in a checkout of this repo; VGI516).
+# Pinned to v0.4.0, a tag at which the file exists, so it never moves.
+SAMPLE_IMAGE_URL = "https://raw.githubusercontent.com/Query-farm/vgi-vision/v0.4.0/test/sql/data/sample.png"
 
 # ---------------------------------------------------------------------------
 # Composed examples: queries that combine two of the worker's objects. Each SQL is
 # defined once here and referenced from the schema-level list and from the example
 # list of the object that drives the query (within its first five examples, which is
-# all the vgi-lint agent simulator shows). They use the committed fixture path, so
-# they run offline and deterministically.
+# all the vgi-lint agent simulator shows). ``classify`` takes its image as a literal,
+# so its composed examples embed the BLOB literal; ``top_label`` is a scalar, so its
+# composed example reads the published fixture URL with ``read_blob``.
 #
 # ImageNet's class index is ordered by synset: idx 0-397 are animals and
 # idx 151-268 are the 118 dog breeds. ``classify`` returns labels only, so joining
@@ -59,12 +60,12 @@ SAMPLE_IMAGE_PATH = "test/sql/data/sample.png"
 
 COMPOSED_CLASSIFY_WITH_INDEX = {
     "description": (
-        "Join the top-10 predictions for an image file to the image_classes lookup table to "
+        "Join the top-10 predictions for an image BLOB to the image_classes lookup table to "
         "recover each predicted label's ImageNet class index (idx), most-confident first."
     ),
     "sql": (
         "SELECT c.idx, p.label, round(p.confidence, 4) AS confidence "
-        f"FROM vision.main.classify('{SAMPLE_IMAGE_PATH}', 10) AS p "
+        f"FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 10) AS p "
         "JOIN vision.main.image_classes AS c USING (label) "
         "ORDER BY p.confidence DESC"
     ),
@@ -72,14 +73,14 @@ COMPOSED_CLASSIFY_WITH_INDEX = {
 
 COMPOSED_DOG_PROBABILITY = {
     "description": (
-        "Roll the full 1000-class distribution for an image file up to one coarse category: "
+        "Roll the full 1000-class distribution for an image BLOB up to one coarse category: "
         "total probability on the 118 dog-breed classes (ImageNet idx 151-268, found via "
         "image_classes) and the most likely breed among them."
     ),
     "sql": (
         "SELECT count(*) AS n_breeds, round(sum(p.confidence), 4) AS dog_probability, "
         "arg_max(p.label, p.confidence) AS likeliest_breed "
-        f"FROM vision.main.classify('{SAMPLE_IMAGE_PATH}', 1000) AS p "
+        f"FROM vision.main.classify('{SAMPLE_IMAGE_BLOB}'::BLOB, 1000) AS p "
         "JOIN vision.main.image_classes AS c USING (label) "
         "WHERE c.idx BETWEEN 151 AND 268"
     ),
@@ -87,14 +88,14 @@ COMPOSED_DOG_PROBABILITY = {
 
 COMPOSED_TOP_LABEL_WITH_INDEX = {
     "description": (
-        "Tag a list of image files with top_label and look each label up in image_classes for "
-        "its class index; an unreadable file gets a NULL label, so the LEFT JOIN keeps it with "
-        "NULL idx."
+        "Tag images fetched with read_blob using top_label and look each label up in "
+        "image_classes for its class index; a file that is not an image gets a NULL label, "
+        "so the LEFT JOIN keeps it with NULL idx."
     ),
     "sql": (
-        "SELECT f.path, c.idx, c.label "
-        f"FROM (VALUES ('{SAMPLE_IMAGE_PATH}'), ('test/sql/data/missing.png')) AS f(path) "
-        "LEFT JOIN vision.main.image_classes AS c ON c.label = vision.main.top_label(f.path) "
-        "ORDER BY f.path"
+        "SELECT f.filename, c.idx, c.label "
+        f"FROM read_blob('{SAMPLE_IMAGE_URL}') AS f "
+        "LEFT JOIN vision.main.image_classes AS c ON c.label = vision.main.top_label(f.content) "
+        "ORDER BY f.filename"
     ),
 }
