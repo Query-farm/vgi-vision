@@ -7,7 +7,7 @@
 # classifier (onnxruntime); the model + ImageNet labels are baked into the image so the
 # first query and the /health boot are fast (no first-use download).
 # syntax=docker/dockerfile:1
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 ARG VERSION=0.0.0
 ARG GIT_COMMIT=unknown
