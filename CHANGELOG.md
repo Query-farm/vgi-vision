@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2 (2026-11-16)
+
+- Bump vgi-python to 0.52.2 (`>=0.52.2,<0.53`).
+- Python 3.14 (requires-python floor, CI, Docker image and tooling).
+- SQL integration tests run on every transport (stdio, launch, http) through
+  the starter's `ci/run-integration.sh`; `make check` runs all three.
+
 ## 0.4.1 — 2026-11-14
 
 - The worker's own ruff run excludes `notebooks/` (`[tool.ruff] extend-exclude`).
